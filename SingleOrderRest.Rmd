@@ -1,0 +1,124 @@
+---
+title: "Removal by Individual Order Restoration"
+output: html_document
+date: "2023-05-23"
+---
+
+#Housekeeping:
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+theme_set(theme_classic())
+library(dplyr)
+library(tidyverse)
+library(stringr)
+library(tidyr)
+library(readr)
+```
+
+#Preparing Data Frames
+```{r}
+#read in Q2 data for 1st order restoration. Locale argument is to fix error recieved for using a local file.
+Q2_unr <- read_csv("Q2_unr.csv")
+Q2_1st_20p <- read_csv("Q2_1st-20p.csv", locale=locale(encoding="latin1"))
+Q2_1st_40p <- read_csv("Q2_1st-40p.csv", locale=locale(encoding="latin1"))
+Q2_1st_60p <- read_csv("Q2_1st-60p.csv", locale=locale(encoding="latin1"))
+Q2_1st_80p <- read_csv("Q2_1st-80p.csv", locale=locale(encoding="latin1"))
+Q2_1st_100p <- read_csv("Q2_1st-100p.csv", locale=locale(encoding="latin1"))
+
+#R is changing the first colum name for these files--dont know why.
+colnames(Q2_1st_20p)[1] <- "storm"
+colnames(Q2_1st_40p)[1] <- "storm"
+colnames(Q2_1st_60p)[1] <- "storm"
+colnames(Q2_1st_80p)[1] <- "storm"
+colnames(Q2_1st_100p)[1] <- "storm"
+
+#combine to single data frame
+Q2_1stO <- rbind(Q2_unr, 
+                 Q2_1st_20p, 
+                 Q2_1st_40p, 
+                 Q2_1st_60p, 
+                 Q2_1st_80p, 
+                 Q2_1st_100p) %>%
+  drop_na(STA)
+```
+
+
+#%NO3 Removal by 1st Order River Restoration
+```{r}
+NO3_Q2_1stO <- Q2_1stO %>%
+  group_by(plan, STA, river) %>% 
+  mutate(
+    ti_min = case_when(wettedFPw >= 16.5 ~ 15)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>%
+  mutate(
+    FP_width = 
+           case_when(
+             plan == "unr" & river == "1_7" ~ 16.5, 
+             plan == "1st-20p" & river == "1_7" & STA >= 164300 ~ 60,
+             plan == "1st-20p" & river == "1_7" & STA < 164300 ~ 16.5,
+             plan == "1st-40p" & river == "1_7" & STA >= 163100 ~ 60,
+             plan == "1st-40p" & river == "1_7" & STA < 163100 ~ 16.5,
+             plan == "1st-60p" & river == "1_7" & STA >= 161900 ~ 60,
+             plan == "1st-60p" & river == "1_7" & STA < 161900 ~ 16.5,
+             plan == "1st-80p" & river == "1_7" & STA >= 160700 ~ 60,
+             plan == "1st-80p" & river == "1_7" & STA < 160700 ~ 16.5,
+             plan == "1st-100p" & river == "1_7" ~ 60,
+             river == "2_2" ~ 34.5,
+             river == "3_1" ~ 67.5,
+             river == "4_1" ~ 126)) %>% 
+  mutate(
+    removal_g = 
+      case_when(river == "1_7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k/1000, 
+                river == "1_7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k/1000,
+                            
+                river == "2_2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k/1000, 
+                river == "2_2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k/1000,
+
+                river == "3_1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k/1000, 
+                river == "3_1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k/1000,
+                          
+                river == "4_1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k/1000, 
+                river == "4_1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k/1000)) %>% 
+  ungroup() %>%
+  group_by(plan, river) %>%
+  summarise(N_removal_g = sum(removal_g)) %>%
+  mutate_if(is.numeric, # Using dplyr functions
+            round,
+            digits = 0)
+
+Plot_1stO <- NO3_Q2_1stO %>%
+  mutate(tot_removal = case_when(river == "1_7" ~ N_removal_g*24, 
+                                 river == "2_2" ~ N_removal_g*6,
+                                 river == "3_1" ~ N_removal_g*2,
+                                 river == "4_1" ~ N_removal_g)) %>%
+  ungroup()%>%
+  group_by(plan) %>%
+  summarise(tot_N_Removed_g = sum(tot_removal)) %>% 
+  mutate(percentRest = c(100, 20, 40, 60, 80, 0)) %>%
+  mutate(percentRemoved = (tot_N_Removed_g/watershed_load)*100)
+
+Plot_1stO %>% 
+  ggplot(aes(percentRest, percentRemoved)) +
+  geom_point()+
+  geom_line()+
+  xlab("% of 1st-order Streams Restored")+
+  ylab("%NO3 Removed from Watershed")+
+  ylim(0, 2)
+
+#if need to check what is grouped
+group_keys(NO3_Q2_1stO)
+
+```
+

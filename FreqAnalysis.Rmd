@@ -1,0 +1,575 @@
+---
+title: "HECRAS Output Data Frequency Analysis"
+output: html_document
+date: "2023-05-18"
+---
+###Frequency analysis conducted on 100% watershed restoration for a Q1, Qmonth, and Q0.5 storm
+#Housekeeping:
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(dplyr)
+library(tidyverse)
+library(stringr)
+library(tidyr)
+```
+
+#Constants
+```{r}
+watershed_load <- 3653360.9 #total NO3 load to the watershed (grams)
+load1 <- 4290.59 #input load to a single first order stream (grams)
+load2 <- 37795.52 #input load to a single second order stream (grams)
+load3 <- 371227.69 #input load to a single third order stream (grams)
+load4 <- 3548993.81 #input load to the fourth order stream (grams)
+
+k <- 0.061
+#1.3 90th percentile actual rate from database (mg-N/ft2-hr) #12.08 max from EST paper  #15.97 max actual from database #0.061 median actual from database #0.8178  median potential from database
+Xcs <- 50 #Distance between cross sections (ft)
+
+
+w_1stO <- 60 #width of one 1st order floodplain (ft)
+w_2ndO <- 65 #width of one 2nd order floodplain (ft)
+w_3rdO <- 75 #width of one 3rd order floodplain (ft)
+w_4thO <- 130 #width of one 4th order floodplain (ft)
+
+
+```
+
+#Q1
+##FIRST ORDERS:
+###6-min data output frequency
+```{r}
+R17_6min_Q1 <- read_csv("FrequencyData/1_7_6min_Q1_full4th100p.csv") %>%
+  group_by(STA) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_1stO ~ 6)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>% #how long each XS is inundated
+  mutate(
+    removal_g = case_when(STA %in% c(165500,159500) ~ (ti_tot_min/60)*(Xcs/2)*(w_1stO*2)*k/1000,
+                                               TRUE ~ (ti_tot_min/60)*Xcs*(w_1stO*2)*k/1000))
+
+Removal17_6min_Q1 <- R17_6min_Q1 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g)) %>%
+  mutate(
+    percent_removed = ((totalRemoval_g*24)/watershed_load)*100,
+    storm = "Q1",
+    river = "1_7", 
+    data_freq = "6min")
+
+```
+
+###10-min data output frequency
+```{r}
+R17_10min_Q1 <- read_csv("FrequencyData/1_7_10min_Q1_full4th100p.csv") %>%
+  group_by(STA) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_1stO ~ 10)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>% 
+  mutate(
+    removal_g = case_when(STA %in% c(165500, 159500) ~ (ti_tot_min/60)*(Xcs/2)*(w_1stO*2)*k/1000,
+                                    TRUE ~ (ti_tot_min/60)*Xcs*(w_1stO*2)*k/1000))
+
+Removal17_10min_Q1 <- R17_10min_Q1 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g)) %>%
+  mutate(
+    percent_removed = ((totalRemoval_g*24)/watershed_load)*100,
+    storm = "Q1",
+    river = "1_7", 
+    data_freq = "10min")
+```
+
+###15-min data output frequency
+```{r}
+R17_15min_Q1 <- read_csv("FrequencyData/1_7_15min_Q1_full4th100p.csv") %>%
+  mutate(sta = 
+           case_when(
+             endsWith(STA, ".*") ~ substr(STA, 1, nchar(STA)-2), 
+             TRUE ~ STA))%>%
+  group_by(sta) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_1stO ~ 15)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>% 
+  mutate(
+    removal_g = case_when(sta %in% c(165500, 159500) ~ (ti_tot_min/60)*(Xcs/2)*(w_1stO*2)*k/1000,
+                                   TRUE ~ (ti_tot_min/60)*Xcs*(w_1stO*2)*k/1000))
+
+Removal17_15min_Q1 <- R17_15min_Q1 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g)) %>%
+  mutate(
+    percent_removed = ((totalRemoval_g*24)/watershed_load)*100,
+    storm = "Q1",
+    river = "1_7", 
+    data_freq = "15min")
+```
+
+##SECOND ORDER:
+###6-min data output frequency
+```{r}
+R22_6min_Q1 <- read_csv("FrequencyData/2_2_6min_Q1_full4th100p.csv") %>%
+  group_by(STA) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_2ndO ~ 6))%>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>% #how long each XS is inundated
+  mutate(
+    removal_g = case_when(STA %in% c(159500, 154000, 148500, 143000) ~ (ti_tot_min/60)*(Xcs/2)*(w_2ndO*2)*k/1000,
+                                   TRUE ~ (ti_tot_min/60)*Xcs*(w_2ndO*2)*k/1000)) #all other XS have normal spacing  
+
+Removal22_6min_Q1 <- R22_6min_Q1 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g)) %>%
+  mutate(
+    percent_removed = ((totalRemoval_g*6)/watershed_load)*100,
+    storm = "Q1",
+    river = "2_2", 
+    data_freq = "6min")
+```
+
+###10-min data output frequency
+```{r}
+#10 minute data frequency
+R22_10min_Q1 <- read_csv("FrequencyData/2_2_10min_Q1_full4th100p.csv") %>%
+  group_by(STA) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_2ndO ~ 10))%>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>% #how long each XS is inundated
+  mutate(
+    removal_g = case_when(STA %in% c(159500, 154000, 148500, 143000) ~ (ti_tot_min/60)*(Xcs/2)*(w_2ndO*2)*k/1000,
+                                   TRUE ~ (ti_tot_min/60)*Xcs*(w_2ndO*2)*k/1000)) #all other XS have normal spacing  
+
+Removal22_10min_Q1 <- R22_10min_Q1 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g)) %>%
+  mutate(
+    percent_removed = ((totalRemoval_g*6)/watershed_load)*100,
+    storm = "Q1",
+    river = "2_2", 
+    data_freq = "10min")
+```
+
+###15-min data output frequency
+```{r}
+#15 minute data frequency
+R22_15min_Q1 <- read_csv("FrequencyData/2_2_15min_Q1_full4th100p.csv") %>%
+  mutate(sta = 
+           case_when(
+             endsWith(STA, ".*") ~ substr(STA, 1, nchar(STA)-2), 
+             TRUE ~ STA))%>%
+  group_by(sta) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_2ndO ~ 15))%>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>% #how long each XS is inundated
+  mutate(
+    removal_g = case_when(sta %in% c(159500, 154000, 148500, 143000) ~ (ti_tot_min/60)*(Xcs/2)*(w_2ndO*2)*k/1000,
+                                   TRUE ~ (ti_tot_min/60)*Xcs*(w_2ndO*2)*k/1000)) #all other XS have normal spacing 
+
+Removal22_15min_Q1 <- R22_15min_Q1 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g))%>%
+  mutate(
+    percent_removed = ((totalRemoval_g*6)/watershed_load)*100,
+    storm = "Q1",
+    river = "2_2", 
+    data_freq = "15min")
+```
+
+##THIRD ORDERS:
+###15-min data output frequency
+```{r}
+R31_15min_Q1 <- read_csv("FrequencyData/3_1_15min_Q1_full4th100p.csv") %>%
+  mutate(sta = 
+           case_when(
+             endsWith(STA, ".*") ~ substr(STA, 1, nchar(STA)-2), 
+             TRUE ~ STA)) %>%
+  group_by(sta) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_3rdO ~ 15)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>%
+  mutate(
+    removal_g = case_when(sta %in% c(143000, 122000,  101000) ~ (ti_tot_min/60)*(Xcs/2)*(w_3rdO*2)*k/1000,
+                                    TRUE ~ (ti_tot_min/60)*Xcs*(w_3rdO*2)*k/1000))
+
+Removal31_15min_Q1 <- R31_15min_Q1 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g))%>%
+  mutate(
+    percent_removed = ((totalRemoval_g*2)/watershed_load)*100,
+    storm = "Q1",
+    river = "3_1", 
+    data_freq = "15min")
+  
+#write.csv(river31_15min, file = "Exports/river31_15min_Q1.csv")
+```
+
+##FOURTH ORDERS:
+###15-min data output frequency
+```{r}
+R41_15min_Q1 <- read_csv("FrequencyData/4_1_15min_Q1_full4th100p.csv") %>%
+    mutate(sta = 
+           case_when(
+             endsWith(STA, ".*") ~ substr(STA, 1, nchar(STA)-2),
+             endsWith(STA, ".0*") ~ substr(STA, 1, nchar(STA)-3),
+             endsWith(STA, ".00*") ~ substr(STA, 1, nchar(STA)-4),
+             TRUE ~ STA)) %>%
+  group_by(sta) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_4thO ~ 15)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>%
+  mutate(
+    removal_g = case_when(sta %in% c(101000, 0) ~ (ti_tot_min/60)*(Xcs/2)*(w_4thO*2)*k/1000,
+                           TRUE ~ (ti_tot_min/60)*Xcs*(w_4thO*2)*k/1000))
+
+#cleanup. Don't know why the stations wont go in order automatically, probably bc they're a characters instead of numbers
+R41_15min_Q1$sta <-  as.numeric(R41_15min_Q1$sta)
+R41_15min_Q1 <- R41_15min_Q1[order(R41_15min_Q1$sta, decreasing = TRUE),]
+
+Removal41_15min_Q1 <- R41_15min_Q1 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g))%>%
+  mutate(
+    percent_removed = (totalRemoval_g/watershed_load)*100,
+    storm = "Q1",
+    river = "4_1", 
+    data_freq = "15min")
+
+#write.csv(river41_15min, file = "Exports/river41_15min.csv")
+
+Q1_freq_removal <- rbind(Removal17_6min_Q1, Removal17_10min_Q1, Removal17_15min_Q1,
+                        Removal22_6min_Q1, Removal22_10min_Q1, Removal22_15min_Q1,
+                        Removal31_15min_Q1,
+                        Removal41_15min_Q1) %>%                   
+  mutate_if(is.numeric, # Using dplyr functions
+            round,
+            digits = 3)
+```
+
+#Q0.5
+##FIRST ORDER:
+###5-min data output frequency
+```{r}
+R17_5min_Q0.5 <- read_csv("FrequencyData/1_7_5min_0.5Q_full4th100p.csv") %>%
+  group_by(STA) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_1stO ~ 5)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>% #how long each XS is inundated
+  mutate(
+    removal_g = case_when(STA %in% c(165500,159500) ~ (ti_tot_min/60)*(Xcs/2)*(w_1stO*2)*k/1000,
+                                   TRUE ~ (ti_tot_min/60)*Xcs*(w_1stO*2)*k/1000))
+
+Removal17_5min_Q0.5 <- R17_5min_Q0.5 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g)) %>%
+  mutate(
+    percent_removed = ((totalRemoval_g*24)/watershed_load)*100,
+    storm = "Q0.5",
+    river = "1_7", 
+    data_freq = "5min") 
+
+```
+
+###10-min data output frequency
+```{r}
+R17_10min_Q0.5 <- read_csv("FrequencyData/1_7_10min_0.5Q_full4th100p.csv") %>%
+  group_by(STA) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_1stO ~ 10)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>% #how long each XS is inundated
+  mutate(
+    removal_g = case_when(STA %in% c(165500, 159500) ~ (ti_tot_min/60)*(Xcs/2)*(w_1stO*2)*k/1000,
+                                   TRUE ~ (ti_tot_min/60)*Xcs*(w_1stO*2)*k/1000))
+
+Removal17_10min_Q0.5 <- R17_10min_Q0.5 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g)) %>%
+  mutate(
+    percent_removed = ((totalRemoval_g*24)/watershed_load)*100,
+    storm = "Q0.5",
+    river = "1_7", 
+    data_freq = "10min")
+```
+
+###15-min data output frequency
+```{r}
+R17_15min_Q0.5 <- read_csv("FrequencyData/1_7_15min_0.5Q_full4th100p.csv") %>%
+  group_by(STA) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_1stO ~ 15)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>% #how long each XS is inundated
+  mutate(
+    removal_g = case_when(STA %in% c(165500, 159500) ~ (ti_tot_min/60)*(Xcs/2)*(w_1stO*2)*k/1000,
+                                   TRUE ~ (ti_tot_min/60)*Xcs*(w_1stO*2)*k/1000))
+
+Removal17_15min_Q0.5 <- R17_15min_Q0.5 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g)) %>%
+  mutate(
+    percent_removed = ((totalRemoval_g*24)/watershed_load)*100,
+    storm = "Q0.5",
+    river = "1_7", 
+    data_freq = "15min")
+```
+
+##SECOND ORDER:
+###5-min data output frequency
+```{r}
+R22_5min_Q0.5 <- read_csv("FrequencyData/2_2_5min_0.5Q_full4th100p.csv") %>%
+  group_by(STA) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_2ndO ~ 5))%>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>% #how long each XS is inundated
+  mutate(
+    removal_g = case_when(STA %in% c(159500, 154000, 148500, 143000) ~ (ti_tot_min/60)*(Xcs/2)*(w_2ndO*2)*k/1000, 
+                                   TRUE ~ (ti_tot_min/60)*Xcs*(w_2ndO*2)*k/1000)) #all other XS have normal spacing 
+
+Removal22_5min_Q0.5 <- R22_5min_Q0.5 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g)) %>%
+  mutate(
+    percent_removed = ((totalRemoval_g*6)/watershed_load)*100,
+    storm = "Q0.5",
+    river = "2_2", 
+    data_freq = "5min")
+```
+
+###10-min data output frequency
+```{r}
+R22_10min_Q0.5 <- read_csv("FrequencyData/2_2_10min_0.5Q_full4th100p.csv") %>%
+  group_by(STA) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_2ndO ~ 10))%>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>% #how long each XS is inundated
+  mutate(
+    removal_g = case_when(STA %in% c(159500, 154000, 148500, 143000) ~ (ti_tot_min/60)*(Xcs/2)*(w_2ndO*2)*k/1000, 
+                                   TRUE ~ (ti_tot_min/60)*Xcs*(w_2ndO*2)*k/1000)) #all other XS have normal spacing 
+
+Removal22_10min_Q0.5 <- R22_10min_Q0.5 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g)) %>%
+  mutate(
+    percent_removed = ((totalRemoval_g*6)/watershed_load)*100,
+    storm = "Q0.5",
+    river = "2_2", 
+    data_freq = "10min")
+```
+
+###15-min data output frequency
+```{r}
+R22_15min_Q0.5 <- read_csv("FrequencyData/2_2_15min_0.5Q_full4th100p.csv") %>%
+  group_by(STA) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_2ndO ~ 15))%>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>% #how long each XS is inundated
+  mutate(
+    removal_g = case_when(STA %in% c(159500, 154000, 148500, 143000) ~ (ti_tot_min/60)*(Xcs/2)*(w_2ndO*2)*k/1000, 
+                                   TRUE ~ (ti_tot_min/60)*Xcs*(w_2ndO*2)*k/1000)) #all other XS have normal spacing 
+ 
+Removal22_15min_Q0.5 <- R22_15min_Q0.5 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g)) %>%
+  mutate(
+    percent_removed = ((totalRemoval_g*6)/watershed_load)*100,
+    storm = "Q0.5",
+    river = "2_2", 
+    data_freq = "15min")
+```
+
+##THIRD ORDER:
+###5-min data output frequency
+```{r}
+R31_5min_Q0.5 <- read_csv("FrequencyData/3_1_5min_0.5Q_full4th100p.csv") %>%
+  group_by(STA) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_3rdO ~ 5)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>%
+  mutate(
+    removal_g = case_when(STA %in% c(143000, 101000) ~ (ti_tot_min/60)*(Xcs/2)*(w_3rdO*2)*k/1000,
+                                    TRUE ~ (ti_tot_min/60)*Xcs*(w_3rdO*2)*k/1000))
+
+Removal31_5min_Q0.5 <- R31_5min_Q0.5 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g))%>%
+  mutate(
+    percent_removed = ((totalRemoval_g*2)/watershed_load)*100,
+    storm = "Q0.5",
+    river = "3_1", 
+    data_freq = "5min")
+```
+
+###10-min data output frequency
+```{r}
+R31_10min_Q0.5 <- read_csv("FrequencyData/3_1_10min_0.5Q_full4th100p.csv") %>%
+  group_by(STA) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_3rdO ~ 10)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>%
+  mutate(
+    removal_g = case_when(STA %in% c(143000, 101000) ~ (ti_tot_min/60)*(Xcs/2)*(w_3rdO*2)*k/1000,
+                                    TRUE ~ (ti_tot_min/60)*Xcs*(w_3rdO*2)*k/1000))
+
+Removal31_10min_Q0.5 <- R31_10min_Q0.5 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g))%>%
+  mutate(
+    percent_removed = ((totalRemoval_g*2)/watershed_load)*100,
+    storm = "Q0.5",
+    river = "3_1", 
+    data_freq = "10min")
+```
+
+###15-min data output frequency
+```{r}
+R31_15min_Q0.5 <- read_csv("FrequencyData/3_1_15min_0.5Q_full4th100p.csv") %>%
+  group_by(STA) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_3rdO ~ 15)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>%
+  mutate(
+    removal_g = case_when(STA %in% c(143000, 101000) ~ (ti_tot_min/60)*(Xcs/2)*(w_3rdO*2)*k/1000,
+                                    TRUE ~ (ti_tot_min/60)*Xcs*(w_3rdO*2)*k/1000))
+
+Removal31_15min_Q0.5 <- R31_15min_Q0.5 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g))%>%
+  mutate(
+    percent_removed = ((totalRemoval_g*2)/watershed_load)*100,
+    storm = "Q0.5",
+    river = "3_1", 
+    data_freq = "15min")
+```
+
+#FOURTH ORDER
+###10-min data output frequency
+```{r}
+R41_10min_Q0.5 <- read_csv("FrequencyData/4_1_10min_0.5Q_full4th100p.csv") %>%
+  group_by(STA) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_4thO ~ 10)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>%
+  mutate(
+    removal_g = case_when(STA %in% c(101000, 0) ~ (ti_tot_min/60)*(Xcs/2)*(w_4thO*2)*k/1000,
+                           TRUE ~ (ti_tot_min/60)*Xcs*(w_4thO*2)*k/1000))
+
+#for some reason  50 is not in the STA column. Instead there is an NA in place.
+
+#cleanup. Don't know why the stations wont go in order automatically, probably bc they're a characters instead of numbers
+R41_10min_Q0.5$STA <-  as.numeric(R41_10min_Q0.5$STA)
+R41_10min_Q0.5 <- R41_10min_Q0.5[order(R41_10min_Q0.5$STA, decreasing = TRUE),]
+
+Removal41_10min_Q0.5 <- R41_10min_Q0.5 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g))%>%
+  mutate(
+    percent_removed = (totalRemoval_g/watershed_load)*100,
+    storm = "Q0.5",
+    river = "4_1", 
+    data_freq = "10min")
+```
+
+###15-min data output frequency
+```{r}
+R41_15min_Q0.5 <- read_csv("FrequencyData/4_1_15min_0.5Q_full4th100p.csv") %>%
+    mutate(sta = 
+           case_when(
+             endsWith(STA, ".*") ~ substr(STA, 1, nchar(STA)-2), #Clean up bc didn't edit out the .* in excel before uploading
+             endsWith(STA, ".0*") ~ substr(STA, 1, nchar(STA)-3),
+             endsWith(STA, ".00*") ~ substr(STA, 1, nchar(STA)-4),
+             TRUE ~ STA)) %>%
+  group_by(sta) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_4thO ~ 15)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>%
+  mutate(
+    removal_g = case_when(sta %in% c(101000, 0) ~ (ti_tot_min/60)*(Xcs/2)*(w_4thO*2)*k/1000,
+                           TRUE ~ (ti_tot_min/60)*Xcs*(w_4thO*2)*k/1000))
+
+#cleanup. Don't know why the stations wont go in order automatically, probably bc they're a characters instead of numbers
+R41_15min_Q0.5$sta <-  as.numeric(R41_15min_Q0.5$sta)
+R41_15min_Q0.5 <- R41_15min_Q0.5[order(R41_15min_Q0.5$sta, decreasing = TRUE),]
+
+Removal41_15min_Q0.5 <- R41_15min_Q0.5 %>%
+  summarise(
+    totalRemoval_g = sum(removal_g))%>%
+  mutate(
+    percent_removed = (totalRemoval_g/watershed_load)*100,
+    storm = "Q0.5",
+    river = "4_1", 
+    data_freq = "15min")
+
+#write.csv(river41_15min, file = "Exports/river41_15min.csv")
+
+Q0.5_freq_removal <- rbind(Removal17_5min_Q0.5, Removal17_10min_Q0.5, Removal17_15min_Q0.5,
+                        Removal22_5min_Q0.5, Removal22_10min_Q0.5, Removal22_15min_Q0.5,
+                        Removal31_5min_Q0.5, Removal31_10min_Q0.5, Removal31_15min_Q0.5,
+                        Removal41_15min_Q0.5) %>%                   
+  mutate_if(is.numeric, # Using dplyr functions
+            round,
+            digits = 4)
+```
+
+#Qmonth
+##FIRST & SECOND ORDER:
+###5-min data output frequency only
+```{r}
+R17_5min_Qm <- read_csv("FrequencyData/1_7_5min_Qm_full4th100p.csv") %>%
+  group_by(STA) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_1stO ~ 5)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>% #how long each XS is inundated
+  mutate(
+    removal_g = case_when(STA %in% c(165500, 159500) ~ (ti_tot_min/60)*(Xcs/2)*(w_1stO*2)*k/1000,
+                                   TRUE ~ (ti_tot_min/60)*Xcs*(w_1stO*2)*k/1000))
+
+Removal17_5min_Qm <- R17_5min_Qm %>%
+  summarise(
+    totalRemoval_g = sum(removal_g)) %>%
+  mutate(
+    percent_removed = ((totalRemoval_g*24)/watershed_load)*100,
+     storm = "Qm",
+    river = "1_7", 
+    data_freq = "5min") 
+
+
+R22_5min_Qm <- read_csv("FrequencyData/2_2_5min_Qm_full4th100p.csv") %>%
+  group_by(STA) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_2ndO ~ 5))%>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>% #how long each XS is inundated
+  mutate(
+    removal_g = case_when(STA %in% c(159500, 154000, 148500, 143000) ~ (ti_tot_min/60)*(Xcs/2)*(w_2ndO*2)*k/1000,
+                                   TRUE ~ (ti_tot_min/60)*Xcs*(w_2ndO*2)*k/1000)) #all other XS have normal spacing  
+
+Removal22_5min_Qm <- R22_5min_Qm %>%
+  summarise(
+    totalRemoval_g = sum(removal_g)) %>%
+  mutate(
+    percent_removed = ((totalRemoval_g*6)/watershed_load)*100,
+    storm = "Qm",
+    river = "2_2", 
+    data_freq = "5min")
+
+Qm_freq_removal <- rbind(Removal17_5min_Qm, Removal22_5min_Qm)
+freq_removal <- rbind(Q1_freq_removal, Q0.5_freq_removal, Qm_freq_removal)
+```
