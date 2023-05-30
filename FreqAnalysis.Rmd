@@ -22,7 +22,7 @@ load2 <- 37795.52 #input load to a single second order stream (grams)
 load3 <- 371227.69 #input load to a single third order stream (grams)
 load4 <- 3548993.81 #input load to the fourth order stream (grams)
 
-k <- 0.061
+k <- 0.061 #0.0067 10th percentile
 #1.3 90th percentile actual rate from database (mg-N/ft2-hr) #12.08 max from EST paper  #15.97 max actual from database #0.061 median actual from database #0.8178  median potential from database
 Xcs <- 50 #Distance between cross sections (ft)
 

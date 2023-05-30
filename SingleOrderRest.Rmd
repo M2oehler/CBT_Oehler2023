@@ -7,23 +7,40 @@ date: "2023-05-23"
 #Housekeeping:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
-theme_set(theme_classic())
+
 library(dplyr)
 library(tidyverse)
 library(stringr)
 library(tidyr)
 library(readr)
+theme_set(theme_classic())
 ```
 
 #Preparing Data Frames
 ```{r}
 #read in Q2 data for 1st order restoration. Locale argument is to fix error recieved for using a local file.
-Q2_unr <- read_csv("Q2_unr.csv")
-Q2_1st_20p <- read_csv("Q2_1st-20p.csv", locale=locale(encoding="latin1"))
-Q2_1st_40p <- read_csv("Q2_1st-40p.csv", locale=locale(encoding="latin1"))
-Q2_1st_60p <- read_csv("Q2_1st-60p.csv", locale=locale(encoding="latin1"))
-Q2_1st_80p <- read_csv("Q2_1st-80p.csv", locale=locale(encoding="latin1"))
-Q2_1st_100p <- read_csv("Q2_1st-100p.csv", locale=locale(encoding="latin1"))
+Q2_unr <- read_csv("1stOdata/Q2_unr.csv")
+Q2_1st_20p <- read_csv("1stOdata/Q2_1st-20p.csv", locale=locale(encoding="latin1"))
+Q2_1st_40p <- read_csv("1stOdata/Q2_1st-40p.csv", locale=locale(encoding="latin1"))
+Q2_1st_60p <- read_csv("1stOdata/Q2_1st-60p.csv", locale=locale(encoding="latin1"))
+Q2_1st_80p <- read_csv("1stOdata/Q2_1st-80p.csv", locale=locale(encoding="latin1"))
+Q2_1st_100p <- read_csv("1stOdata/Q2_1st-100p.csv", locale=locale(encoding="latin1"))
+
+#read in Q1 data for 1st order restoration. Locale argument is to fix error recieved for using a local file.
+Q1_unr <- read_csv("1stOdata/Q1_unr.csv")
+Q1_1st_20p <- read_csv("1stOdata/Q1_1st-20p.csv", locale=locale(encoding="latin1"))
+Q1_1st_40p <- read_csv("1stOdata/Q1_1st-40p.csv", locale=locale(encoding="latin1"))
+Q1_1st_60p <- read_csv("1stOdata/Q1_1st-60p.csv", locale=locale(encoding="latin1"))
+Q1_1st_80p <- read_csv("1stOdata/Q1_1st-80p.csv", locale=locale(encoding="latin1"))
+Q1_1st_100p <- read_csv("1stOdata/Q1_1st-100p.csv", locale=locale(encoding="latin1"))
+
+#read in Q0.5 data for 1st order restoration. Locale argument is to fix error recieved for using a local file.
+Q0.5_unr <- read_csv("1stOdata/Q0.5_unr.csv")
+Q0.5_1st_20p <- read_csv("1stOdata/Q0.5_1st-20p.csv", locale=locale(encoding="latin1"))
+Q0.5_1st_40p <- read_csv("1stOdata/Q0.5_1st-40p.csv", locale=locale(encoding="latin1"))
+Q0.5_1st_60p <- read_csv("1stOdata/Q0.5_1st-60p.csv", locale=locale(encoding="latin1"))
+Q0.5_1st_80p <- read_csv("1stOdata/Q0.5_1st-80p.csv", locale=locale(encoding="latin1"))
+Q0.5_1st_100p <- read_csv("1stOdata/Q0.5_1st-100p.csv", locale=locale(encoding="latin1"))
 
 #R is changing the first colum name for these files--dont know why.
 colnames(Q2_1st_20p)[1] <- "storm"
@@ -38,15 +55,48 @@ Q2_1stO <- rbind(Q2_unr,
                  Q2_1st_40p, 
                  Q2_1st_60p, 
                  Q2_1st_80p, 
-                 Q2_1st_100p) %>%
+                 Q2_1st_100p)%>%
   drop_na(STA)
+
+Q1_1stO <- rbind(Q1_unr,
+                 Q1_1st_20p, 
+                 Q1_1st_40p, 
+                 Q1_1st_60p, 
+                 Q1_1st_80p,
+                 Q1_1st_100p)%>%
+  drop_na(STA)
+
+Q0.5_1stO <- rbind(Q0.5_unr, 
+                   Q0.5_1st_20p,
+                   Q0.5_1st_40p, 
+                   Q0.5_1st_60p, 
+                   Q0.5_1st_80p, 
+                   Q0.5_1st_100p) %>%
+  drop_na(STA)
+
+#need to make space in project. R does not have infinite storage and files are too much.
+rm(#Q2_unr, Q2_1st_20p, Q2_1st_40p, Q2_1st_60p, Q2_1st_80p, 
+                 #Q2_1st_100p, Q1_unr,
+                 #Q1_1st_20p, 
+                 #Q1_1st_40p, 
+                 #Q1_1st_60p, 
+                # Q1_1st_80p,
+                 #Q1_1st_100p, 
+  Q0.5_unr, 
+                   Q0.5_1st_20p,
+                   Q0.5_1st_40p, 
+                   Q0.5_1st_60p, 
+                   Q0.5_1st_80p, 
+                   Q0.5_1st_100p)
 ```
 
 
 #%NO3 Removal by 1st Order River Restoration
 ```{r}
-NO3_Q2_1stO <- Q2_1stO %>%
+
+NO3_Q0.5_1stO <- Q0.5_1stO %>%
   group_by(plan, STA, river) %>% 
+  drop_na(river) %>%
   mutate(
     ti_min = case_when(wettedFPw >= 16.5 ~ 15)) %>%
   summarise(
@@ -98,7 +148,7 @@ NO3_Q2_1stO <- Q2_1stO %>%
             round,
             digits = 0)
 
-Plot_1stO <- NO3_Q2_1stO %>%
+Plot_Q0.5_1stO <- NO3_Q0.5_1stO %>%
   mutate(tot_removal = case_when(river == "1_7" ~ N_removal_g*24, 
                                  river == "2_2" ~ N_removal_g*6,
                                  river == "3_1" ~ N_removal_g*2,
@@ -107,18 +157,21 @@ Plot_1stO <- NO3_Q2_1stO %>%
   group_by(plan) %>%
   summarise(tot_N_Removed_g = sum(tot_removal)) %>% 
   mutate(percentRest = c(100, 20, 40, 60, 80, 0)) %>%
+  mutate(storm = "Q0.5") %>%
   mutate(percentRemoved = (tot_N_Removed_g/watershed_load)*100)
 
+Plot_1stO <- rbind(Plot_Q2_1stO, Plot_Q1_1stO, Plot_Q0.5_1stO)
+
 Plot_1stO %>% 
-  ggplot(aes(percentRest, percentRemoved)) +
+  ggplot(aes(percentRest, percentRemoved, color = storm)) +
   geom_point()+
   geom_line()+
   xlab("% of 1st-order Streams Restored")+
   ylab("%NO3 Removed from Watershed")+
-  ylim(0, 2)
+  ylim(0, 0.5)
 
-#if need to check what is grouped
-group_keys(NO3_Q2_1stO)
+#if need to check what variables are grouped in the dataframe:
+#group_keys(NO3_Q2_1stO)
 
 ```
 
