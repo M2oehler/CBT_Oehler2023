@@ -19,28 +19,18 @@ theme_set(theme_classic())
 #Preparing Data Frames
 ```{r}
 #read in Q2 data for 1st order restoration. Locale argument is to fix error recieved for using a local file.
-Q2_unr <- read_csv("1stOdata/Q2_unr.csv")
-Q2_1st_20p <- read_csv("1stOdata/Q2_1st-20p.csv", locale=locale(encoding="latin1"))
-Q2_1st_40p <- read_csv("1stOdata/Q2_1st-40p.csv", locale=locale(encoding="latin1"))
-Q2_1st_60p <- read_csv("1stOdata/Q2_1st-60p.csv", locale=locale(encoding="latin1"))
-Q2_1st_80p <- read_csv("1stOdata/Q2_1st-80p.csv", locale=locale(encoding="latin1"))
-Q2_1st_100p <- read_csv("1stOdata/Q2_1st-100p.csv", locale=locale(encoding="latin1"))
-
-#read in Q1 data for 1st order restoration. Locale argument is to fix error recieved for using a local file.
-Q1_unr <- read_csv("1stOdata/Q1_unr.csv")
-Q1_1st_20p <- read_csv("1stOdata/Q1_1st-20p.csv", locale=locale(encoding="latin1"))
-Q1_1st_40p <- read_csv("1stOdata/Q1_1st-40p.csv", locale=locale(encoding="latin1"))
-Q1_1st_60p <- read_csv("1stOdata/Q1_1st-60p.csv", locale=locale(encoding="latin1"))
-Q1_1st_80p <- read_csv("1stOdata/Q1_1st-80p.csv", locale=locale(encoding="latin1"))
-Q1_1st_100p <- read_csv("1stOdata/Q1_1st-100p.csv", locale=locale(encoding="latin1"))
-
-#read in Q0.5 data for 1st order restoration. Locale argument is to fix error recieved for using a local file.
-Q0.5_unr <- read_csv("1stOdata/Q0.5_unr.csv")
-Q0.5_1st_20p <- read_csv("1stOdata/Q0.5_1st-20p.csv", locale=locale(encoding="latin1"))
-Q0.5_1st_40p <- read_csv("1stOdata/Q0.5_1st-40p.csv", locale=locale(encoding="latin1"))
-Q0.5_1st_60p <- read_csv("1stOdata/Q0.5_1st-60p.csv", locale=locale(encoding="latin1"))
-Q0.5_1st_80p <- read_csv("1stOdata/Q0.5_1st-80p.csv", locale=locale(encoding="latin1"))
-Q0.5_1st_100p <- read_csv("1stOdata/Q0.5_1st-100p.csv", locale=locale(encoding="latin1"))
+Q2_unr <- read_csv("1stOdata/Q2_unr.csv")%>%
+  drop_na(wettedFPw)
+Q2_1st_20p <- read_csv("1stOdata/Q2_1st-20p.csv", locale=locale(encoding="latin1"))%>%
+  drop_na(wettedFPw)
+Q2_1st_40p <- read_csv("1stOdata/Q2_1st-40p.csv", locale=locale(encoding="latin1"))%>%
+  drop_na(wettedFPw)
+Q2_1st_60p <- read_csv("1stOdata/Q2_1st-60p.csv", locale=locale(encoding="latin1"))%>%
+  drop_na(wettedFPw)
+Q2_1st_80p <- read_csv("1stOdata/Q2_1st-80p.csv", locale=locale(encoding="latin1"))%>%
+  drop_na(wettedFPw)
+Q2_1st_100p <- read_csv("1stOdata/Q2_1st-100p.csv", locale=locale(encoding="latin1"))%>%
+  drop_na(wettedFPw)
 
 #R is changing the first colum name for these files--dont know why.
 colnames(Q2_1st_20p)[1] <- "storm"
@@ -48,6 +38,49 @@ colnames(Q2_1st_40p)[1] <- "storm"
 colnames(Q2_1st_60p)[1] <- "storm"
 colnames(Q2_1st_80p)[1] <- "storm"
 colnames(Q2_1st_100p)[1] <- "storm"
+
+#read in Q1 data for 1st order restoration. Locale argument is to fix error recieved for using a local file.
+Q1_unr <- read_csv("1stOdata/Q1_unr.csv")%>%
+  drop_na(wettedFPw)
+Q1_1st_20p <- read_csv("1stOdata/Q1_1st-20p.csv", locale=locale(encoding="latin1"))%>%
+  drop_na(wettedFPw)
+Q1_1st_40p <- read_csv("1stOdata/Q1_1st-40p.csv", locale=locale(encoding="latin1"))%>%
+  drop_na(wettedFPw)
+Q1_1st_60p <- read_csv("1stOdata/Q1_1st-60p.csv", locale=locale(encoding="latin1"))%>%
+  drop_na(wettedFPw)
+Q1_1st_80p <- read_csv("1stOdata/Q1_1st-80p.csv", locale=locale(encoding="latin1"))%>%
+  drop_na(wettedFPw)
+Q1_1st_100p <- read_csv("1stOdata/Q1_1st-100p.csv", locale=locale(encoding="latin1"))%>%
+  drop_na(wettedFPw)
+
+#read in Q0.5 data for 1st order restoration. Locale argument is to fix error recieved for using a local file.
+Q0.5_unr <- read_csv("1stOdata/Q0.5_unr.csv")%>%
+  drop_na(wettedFPw)
+Q0.5_1st_20p <- read_csv("1stOdata/Q0.5_1st-20p.csv", locale=locale(encoding="latin1"))%>%
+  drop_na(wettedFPw)
+Q0.5_1st_40p <- read_csv("1stOdata/Q0.5_1st-40p.csv", locale=locale(encoding="latin1"))%>%
+  drop_na(wettedFPw)
+Q0.5_1st_60p <- read_csv("1stOdata/Q0.5_1st-60p.csv", locale=locale(encoding="latin1"))%>%
+  drop_na(wettedFPw)
+Q0.5_1st_80p <- read_csv("1stOdata/Q0.5_1st-80p.csv", locale=locale(encoding="latin1"))%>%
+  drop_na(wettedFPw)
+Q0.5_1st_100p <- read_csv("1stOdata/Q0.5_1st-100p.csv", locale=locale(encoding="latin1"))%>%
+  drop_na(wettedFPw)
+
+#read in Qmonth data for 1st order restoration. Locale argument is to fix error recieved for using a local file.
+Qm_unr <- read_csv("1stOdata/Qm_unr.csv")%>%
+  drop_na(wettedFPw)
+Qm_1st_20p <- read_csv("1stOdata/Qm_1st-20p.csv", locale=locale(encoding="latin1"))%>%
+  drop_na(wettedFPw)
+Qm_1st_40p <- read_csv("1stOdata/Qm_1st-40p.csv", locale=locale(encoding="latin1"))%>%
+  drop_na(wettedFPw)
+Qm_1st_60p <- read_csv("1stOdata/Qm_1st-60p.csv", locale=locale(encoding="latin1"), col_types = cols(storm = "c", plan = "c", river = "c", reach = "n", STA = "n", day = "c", hr = "n", min = "n", wettedFPw = "n"))%>%
+  drop_na(wettedFPw)
+Qm_1st_80p <- read_csv("1stOdata/Qm_1st-80p.csv", locale=locale(encoding="latin1"), col_types = cols(storm = "c", plan = "c", river = "c", reach = "n", STA = "n", day = "c", hr = "n", min = "n", wettedFPw = "n"))%>%
+  drop_na(wettedFPw)
+Qm_1st_100p <- read_csv("1stOdata/Qm_1st-100p.csv", locale=locale(encoding="latin1"), col_types = cols(storm = "c", plan = "c", river = "c", reach = "n", STA = "n", day = "c", hr = "n", min = "n", wettedFPw = "n"))%>%
+  drop_na(wettedFPw)
+
 
 #combine to single data frame
 Q2_1stO <- rbind(Q2_unr, 
@@ -57,7 +90,9 @@ Q2_1stO <- rbind(Q2_unr,
                  Q2_1st_80p, 
                  Q2_1st_100p)%>%
   drop_na(STA)
-
+#need to make space in project. R does not have infinite storage and files are too much.
+rm(Q2_unr, Q2_1st_20p, Q2_1st_40p, Q2_1st_60p, Q2_1st_80p, Q2_1st_100p)
+  
 Q1_1stO <- rbind(Q1_unr,
                  Q1_1st_20p, 
                  Q1_1st_40p, 
@@ -65,7 +100,8 @@ Q1_1stO <- rbind(Q1_unr,
                  Q1_1st_80p,
                  Q1_1st_100p)%>%
   drop_na(STA)
-
+rm(Q1_unr,Q1_1st_20p,Q1_1st_40p,Q1_1st_60p, Q1_1st_80p, Q1_1st_100p)
+  
 Q0.5_1stO <- rbind(Q0.5_unr, 
                    Q0.5_1st_20p,
                    Q0.5_1st_40p, 
@@ -73,28 +109,29 @@ Q0.5_1stO <- rbind(Q0.5_unr,
                    Q0.5_1st_80p, 
                    Q0.5_1st_100p) %>%
   drop_na(STA)
+rm(Q0.5_unr, Q0.5_1st_20p,Q0.5_1st_40p, Q0.5_1st_60p,Q0.5_1st_80p,Q0.5_1st_100p)
 
-#need to make space in project. R does not have infinite storage and files are too much.
-rm(#Q2_unr, Q2_1st_20p, Q2_1st_40p, Q2_1st_60p, Q2_1st_80p, 
-                 #Q2_1st_100p, Q1_unr,
-                 #Q1_1st_20p, 
-                 #Q1_1st_40p, 
-                 #Q1_1st_60p, 
-                # Q1_1st_80p,
-                 #Q1_1st_100p, 
-  Q0.5_unr, 
-                   Q0.5_1st_20p,
-                   Q0.5_1st_40p, 
-                   Q0.5_1st_60p, 
-                   Q0.5_1st_80p, 
-                   Q0.5_1st_100p)
+Qm_1stO <- rbind(Qm_unr, 
+                   Qm_1st_20p,
+                   Qm_1st_40p, 
+                   Qm_1st_60p, 
+                   Qm_1st_80p, 
+                   Qm_1st_100p) %>%
+  drop_na(STA)
+rm(Qm_unr, Qm_1st_20p, Qm_1st_40p, Qm_1st_60p, Qm_1st_80p, Qm_1st_100p)
 ```
 
 
 #%NO3 Removal by 1st Order River Restoration
 ```{r}
+k10 <- 0.0067
+km <- 0.067
+k90 <- 1.3
 
-NO3_Q0.5_1stO <- Q0.5_1stO %>%
+#NO3_Q2_1stO <- Q2_1stO %>%
+#NO3_Q1_1stO <- Q1_1stO %>%
+#NO3_Q0.5_1stO <- Q0.5_1stO %>%
+NO3_Qm_1stO <- Qm_1stO %>%
   group_by(plan, STA, river) %>% 
   drop_na(river) %>%
   mutate(
@@ -118,57 +155,145 @@ NO3_Q0.5_1stO <- Q0.5_1stO %>%
              river == "3_1" ~ 67.5,
              river == "4_1" ~ 126)) %>% 
   mutate(
-    removal_g = 
+    k10_removal_g = 
       case_when(river == "1_7" & STA %in% c(165500,159500) 
-                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k/1000, 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
                 river == "1_7" & STA < 165500 & STA > 159500 
-                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k/1000,
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
                             
                 river == "2_2" & STA %in% c(159500, 154000, 148500, 143000) 
-                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k/1000, 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
                 river == "2_2" & (STA < 159500 & STA > 154000) | 
                                  (STA < 154000 & STA > 148500) | 
                                  (STA < 148500 & STA > 143000) 
-                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k/1000,
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
 
                 river == "3_1" & STA %in% c(143000, 122000, 101000) 
-                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k/1000, 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
                 river == "3_1" & (STA < 143000 & STA > 122000) | 
                                  (STA < 122000 & STA > 101000) 
-                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k/1000,
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
                           
                 river == "4_1" & STA %in% c(101000, 0) 
-                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k/1000, 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
                 river == "4_1" & (STA < 101000 & STA > 0) 
-                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k/1000)) %>% 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000)) %>% 
+  mutate(
+    km_removal_g = 
+      case_when(river == "1_7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "1_7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+                            
+                river == "2_2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "2_2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+
+                river == "3_1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "3_1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+                          
+                river == "4_1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "4_1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000)) %>% 
+  mutate(
+    k90_removal_g = 
+      case_when(river == "1_7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "1_7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+                            
+                river == "2_2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "2_2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+
+                river == "3_1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "3_1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+                          
+                river == "4_1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "4_1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000)) %>% 
   ungroup() %>%
   group_by(plan, river) %>%
-  summarise(N_removal_g = sum(removal_g)) %>%
+  summarise(k10_removal_g = sum(k10_removal_g),
+            km_removal_g = sum(km_removal_g),
+            k90_removal_g = sum(k90_removal_g)) %>%
   mutate_if(is.numeric, # Using dplyr functions
             round,
-            digits = 0)
+            digits = 1)
 
-Plot_Q0.5_1stO <- NO3_Q0.5_1stO %>%
-  mutate(tot_removal = case_when(river == "1_7" ~ N_removal_g*24, 
-                                 river == "2_2" ~ N_removal_g*6,
-                                 river == "3_1" ~ N_removal_g*2,
-                                 river == "4_1" ~ N_removal_g)) %>%
+#Plot_Q2_1stO <- NO3_Q2_1stO %>%
+#Plot_Q1_1stO <- NO3_Q1_1stO %>%
+#Plot_Q0.5_1stO <- NO3_Q0.5_1stO %>%
+Plot_Qm_1stO <- NO3_Qm_1stO %>%
+  mutate(k10_tot_removal = case_when(river == "1_7" ~ k10_removal_g*24, 
+                                 river == "2_2" ~ k10_removal_g*6,
+                                 river == "3_1" ~ k10_removal_g*2,
+                                 river == "4_1" ~ k10_removal_g),
+         km_tot_removal = case_when(river == "1_7" ~ km_removal_g*24, 
+                                 river == "2_2" ~ km_removal_g*6,
+                                 river == "3_1" ~ km_removal_g*2,
+                                 river == "4_1" ~ km_removal_g),
+         k90_tot_removal = case_when(river == "1_7" ~ k90_removal_g*24, 
+                                 river == "2_2" ~ k90_removal_g*6,
+                                 river == "3_1" ~ k90_removal_g*2,
+                                 river == "4_1" ~ k90_removal_g)) %>%
   ungroup()%>%
   group_by(plan) %>%
-  summarise(tot_N_Removed_g = sum(tot_removal)) %>% 
+  summarise(k10_tot_Removed_g = sum(k10_tot_removal),
+            km_tot_Removed_g = sum(km_tot_removal),
+            k90_tot_Removed_g = sum(k90_tot_removal)) %>% 
   mutate(percentRest = c(100, 20, 40, 60, 80, 0)) %>%
-  mutate(storm = "Q0.5") %>%
-  mutate(percentRemoved = (tot_N_Removed_g/watershed_load)*100)
+  #mutate(storm = "Q2") %>%
+  #mutate(storm = "Q1") %>%
+  #mutate(storm = "Q0.5") %>%
+  mutate(storm = "Qm") %>%
+  mutate(k10percentRemoved = (k10_tot_Removed_g/watershed_load)*100,
+         kmpercentRemoved = (km_tot_Removed_g/watershed_load)*100,
+         k90percentRemoved = (k90_tot_Removed_g/watershed_load)*100)
 
-Plot_1stO <- rbind(Plot_Q2_1stO, Plot_Q1_1stO, Plot_Q0.5_1stO)
+Plot_1stO <- rbind(Plot_Q2_1stO, Plot_Q1_1stO, Plot_Q0.5_1stO, Plot_Qm_1stO)
+#write.csv(Plot_1stO, file = "Exports/Plot_1stO.csv")
 
 Plot_1stO %>% 
-  ggplot(aes(percentRest, percentRemoved, color = storm)) +
-  geom_point()+
-  geom_line()+
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k10percentRemoved, color = storm))+
+  geom_point(aes(x = percentRest, y = k10percentRemoved, color = storm))+
   xlab("% of 1st-order Streams Restored")+
   ylab("%NO3 Removed from Watershed")+
-  ylim(0, 0.5)
+  scale_x_continuous(breaks=seq(0,100,by=20))
+
+Plot_1stO %>% 
+  ggplot() +
+  geom_line(aes(x = percentRest, y = kmpercentRemoved, color = storm))+
+  geom_point(aes(x = percentRest, y = kmpercentRemoved, color = storm))+
+  xlab("% of 1st-order Streams Restored")+
+  ylab("%NO3 Removed from Watershed")+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ggtitle("NO3 Removal by  1st-order River restoration (median k)")
+
+Plot_1stO %>% 
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90percentRemoved, color = storm))+
+  geom_point(aes(x = percentRest, y = k90percentRemoved, color = storm))+
+  xlab("% of 1st-order Streams Restored")+
+  ylab("%NO3 Removed from Watershed")+
+  #scale_y_log10()+
+  scale_x_continuous(breaks=seq(0,100,by=20))
+  
 
 #if need to check what variables are grouped in the dataframe:
 #group_keys(NO3_Q2_1stO)
