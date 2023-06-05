@@ -16,11 +16,11 @@ library(tidyr)
 
 #Constants
 ```{r}
-watershed_load <- 3653360.9 #total NO3 load to the watershed (grams)
-load1 <- 4290.59 #input load to a single first order stream (grams)
-load2 <- 37795.52 #input load to a single second order stream (grams)
-load3 <- 371227.69 #input load to a single third order stream (grams)
-load4 <- 3548993.81 #input load to the fourth order stream (grams)
+watershed_load <- 3653361 #total NO3 load to the watershed (grams)
+load1 <- 102974 #input load to a all first order streams (grams)
+load2 <- 126125 #input load to a all second order streams (grams)
+load3 <- 545822 #input load to a all third order streams (grams)
+load4 <- 2878440 #input load to the fourth order stream (grams)
 
 k <- 0.067 #0.0067 10th percentile
 #1.3 90th percentile actual rate from database (mg-N/ft2-hr) #12.08 max from EST paper  #15.97 max actual from database #0.061 median actual from database #0.8178  median potential from database

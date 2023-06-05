@@ -16,11 +16,48 @@ library(readr)
 theme_set(theme_classic())
 ```
 
+
+```{r}
+raw.files <- tibble(filename = list.files("TextFiles/"))
+raw.file.paths <- raw.files  %>%
+  mutate(filepath = paste0("TextFiles/", filename))%>%rowwise() 
+
+raw.data <- raw.file.paths %>%
+  rowwise() %>%
+  do(., read_table(file = .$filepath, skip = 12, col_names = c("reach", "STA", "day", "time", "wettedFPw")))
+
+
+raw.files <- list.files("TextFiles/", pattern=".txt")
+## read data using loop
+DF <- NULL
+for (f in raw.file.paths$filepath) {
+   dat <- read_table(f, skip = 12, col_names = c("reach", "STA", "day", "time", "wettedFPw")) %>%
+     mutate(plan = f)
+   DF <- rbind(DF, dat)
+}
+
+DF <- DF %>%
+  drop_na(STA)
+
+Q1_1st20p <- read_table("TextFiles/1-7_Q1_1st-20p.txt", skip = 12, col_names = c("reach", "STA", "day", "time", "wettedFPw")) %>% 
+  drop_na(STA)%>%
+  mutate(STA = 
+           case_when(
+             endsWith(STA, ".*") ~ substr(STA, 1, nchar(STA)-2),
+             endsWith(STA, ".0*") ~ substr(STA, 1, nchar(STA)-3),
+             endsWith(STA, ".00*") ~ substr(STA, 1, nchar(STA)-4),
+             TRUE ~ STA))
+
+#23353 one textfile no space 1st order river
+#640181 for 1 plan all orders no spaces
+
+```
+
 #Preparing Data Frames
 ```{r}
 #read in Q2 data for 1st order restoration. Locale argument is to fix error recieved for using a local file.
 Q2_unr <- read_csv("1stOdata/Q2_unr.csv")%>%
-  drop_na(wettedFPw)
+  drop_na(STA)
 Q2_1st_20p <- read_csv("1stOdata/Q2_1st-20p.csv", locale=locale(encoding="latin1"))%>%
   drop_na(wettedFPw)
 Q2_1st_40p <- read_csv("1stOdata/Q2_1st-40p.csv", locale=locale(encoding="latin1"))%>%
@@ -68,18 +105,12 @@ Q0.5_1st_100p <- read_csv("1stOdata/Q0.5_1st-100p.csv", locale=locale(encoding="
   drop_na(wettedFPw)
 
 #read in Qmonth data for 1st order restoration. Locale argument is to fix error recieved for using a local file.
-Qm_unr <- read_csv("1stOdata/Qm_unr.csv")%>%
-  drop_na(wettedFPw)
-Qm_1st_20p <- read_csv("1stOdata/Qm_1st-20p.csv", locale=locale(encoding="latin1"))%>%
-  drop_na(wettedFPw)
-Qm_1st_40p <- read_csv("1stOdata/Qm_1st-40p.csv", locale=locale(encoding="latin1"))%>%
-  drop_na(wettedFPw)
-Qm_1st_60p <- read_csv("1stOdata/Qm_1st-60p.csv", locale=locale(encoding="latin1"), col_types = cols(storm = "c", plan = "c", river = "c", reach = "n", STA = "n", day = "c", hr = "n", min = "n", wettedFPw = "n"))%>%
-  drop_na(wettedFPw)
-Qm_1st_80p <- read_csv("1stOdata/Qm_1st-80p.csv", locale=locale(encoding="latin1"), col_types = cols(storm = "c", plan = "c", river = "c", reach = "n", STA = "n", day = "c", hr = "n", min = "n", wettedFPw = "n"))%>%
-  drop_na(wettedFPw)
-Qm_1st_100p <- read_csv("1stOdata/Qm_1st-100p.csv", locale=locale(encoding="latin1"), col_types = cols(storm = "c", plan = "c", river = "c", reach = "n", STA = "n", day = "c", hr = "n", min = "n", wettedFPw = "n"))%>%
-  drop_na(wettedFPw)
+Qm_unr <- read_csv("1stOdata/Qm_unr.csv")
+Qm_1st_20p <- read_csv("1stOdata/Qm_1st-20p.csv", locale=locale(encoding="latin1"))
+Qm_1st_40p <- read_csv("1stOdata/Qm_1st-40p.csv", locale=locale(encoding="latin1"))
+Qm_1st_60p <- read_csv("1stOdata/Qm_1st-60p.csv", locale=locale(encoding="latin1"), col_types = cols(storm = "c", plan = "c", river = "c", reach = "n", STA = "n", day = "c", hr = "n", min = "n", wettedFPw = "n"))
+Qm_1st_80p <- read_csv("1stOdata/Qm_1st-80p.csv", locale=locale(encoding="latin1"), col_types = cols(storm = "c", plan = "c", river = "c", reach = "n", STA = "n", day = "c", hr = "n", min = "n", wettedFPw = "n"))
+Qm_1st_100p <- read_csv("1stOdata/Qm_1st-100p.csv", locale=locale(encoding="latin1"), col_types = cols(storm = "c", plan = "c", river = "c", reach = "n", STA = "n", day = "c", hr = "n", min = "n", wettedFPw = "n"))
 
 
 #combine to single data frame
