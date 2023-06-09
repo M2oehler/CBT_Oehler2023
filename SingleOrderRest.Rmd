@@ -39,6 +39,7 @@ for (f in raw.file.paths$filepath) {
 DF <- DF %>%
   drop_na(STA)
 
+
 Q1_1st20p <- read_table("TextFiles/1-7_Q1_1st-20p.txt", skip = 12, col_names = c("reach", "STA", "day", "time", "wettedFPw")) %>% 
   drop_na(STA)%>%
   mutate(STA = 
@@ -160,9 +161,9 @@ km <- 0.067
 k90 <- 1.3
 
 #NO3_Q2_1stO <- Q2_1stO %>%
-#NO3_Q1_1stO <- Q1_1stO %>%
+NO3_Q1_1stO <- Q1_1stO %>%
 #NO3_Q0.5_1stO <- Q0.5_1stO %>%
-NO3_Qm_1stO <- Qm_1stO %>%
+#NO3_Qm_1stO <- Qm_1stO %>%
   group_by(plan, STA, river) %>% 
   drop_na(river) %>%
   mutate(
@@ -266,10 +267,10 @@ NO3_Qm_1stO <- Qm_1stO %>%
             round,
             digits = 1)
 
-#Plot_Q2_1stO <- NO3_Q2_1stO %>%
+Plot_Q2_1stO <- NO3_Q2_1stO %>%
 #Plot_Q1_1stO <- NO3_Q1_1stO %>%
 #Plot_Q0.5_1stO <- NO3_Q0.5_1stO %>%
-Plot_Qm_1stO <- NO3_Qm_1stO %>%
+#Plot_Qm_1stO_i <- NO3_Qm_1stO %>%
   mutate(k10_tot_removal = case_when(river == "1_7" ~ k10_removal_g*24, 
                                  river == "2_2" ~ k10_removal_g*6,
                                  river == "3_1" ~ k10_removal_g*2,
@@ -283,31 +284,34 @@ Plot_Qm_1stO <- NO3_Qm_1stO %>%
                                  river == "3_1" ~ k90_removal_g*2,
                                  river == "4_1" ~ k90_removal_g)) %>%
   ungroup()%>%
-  group_by(plan) %>%
+  group_by(plan, river) %>%
   summarise(k10_tot_Removed_g = sum(k10_tot_removal),
             km_tot_Removed_g = sum(km_tot_removal),
             k90_tot_Removed_g = sum(k90_tot_removal)) %>% 
-  mutate(percentRest = c(100, 20, 40, 60, 80, 0)) %>%
-  #mutate(storm = "Q2") %>%
+  mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
+                                 endsWith(plan, "80p")~ 80,
+                                 endsWith(plan, "60p")~ 60,
+                                 endsWith(plan, "40p")~ 40,
+                                 endsWith(plan, "20p")~ 20,
+                                 endsWith(plan, "unr")~ 0)) %>%
+  mutate(storm = "Q2") %>%
   #mutate(storm = "Q1") %>%
   #mutate(storm = "Q0.5") %>%
-  mutate(storm = "Qm") %>%
-  mutate(k10percentRemoved = (k10_tot_Removed_g/watershed_load)*100,
-         kmpercentRemoved = (km_tot_Removed_g/watershed_load)*100,
-         k90percentRemoved = (k90_tot_Removed_g/watershed_load)*100)
+  #mutate(storm = "Qm") %>%
+  mutate(#k10percentRemoved = (k10_tot_Removed_g/watershed_load)*100,
+         kmpercentRemoved = case_when(river == "1_7" ~ (km_tot_Removed_g/watershed_load)*100,
+                                      river == "2_2" ~ (km_tot_Removed_g/watershed_load)*100,
+                                      river == "3_1" ~ (km_tot_Removed_g/watershed_load)*100,
+                                      river == "4_1" ~ (km_tot_Removed_g/watershed_load)*100))
+         #k90percentRemoved = (k90_tot_Removed_g/watershed_load)*100)
 
-Plot_1stO <- rbind(Plot_Q2_1stO, Plot_Q1_1stO, Plot_Q0.5_1stO, Plot_Qm_1stO)
+Plot_1stO_i <- rbind(Plot_Q2_1stO, Plot_Q1_1stO, Plot_Q0.5_1stO, Plot_Qm_1stO_i)
 #write.csv(Plot_1stO, file = "Exports/Plot_1stO.csv")
+#rm(Plot_Q2_1stO,Plot_Q1_1stO,Plot_Q0.5_1stO,Plot_Qm_1stO_i)
 
-Plot_1stO %>% 
-  ggplot() +
-  geom_line(aes(x = percentRest, y = k10percentRemoved, color = storm))+
-  geom_point(aes(x = percentRest, y = k10percentRemoved, color = storm))+
-  xlab("% of 1st-order Streams Restored")+
-  ylab("%NO3 Removed from Watershed")+
-  scale_x_continuous(breaks=seq(0,100,by=20))
 
-Plot_1stO %>% 
+Plot_1stO_i %>% 
+  filter(river == "4_1")%>%
   ggplot() +
   geom_line(aes(x = percentRest, y = kmpercentRemoved, color = storm))+
   geom_point(aes(x = percentRest, y = kmpercentRemoved, color = storm))+
