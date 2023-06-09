@@ -32,7 +32,7 @@ w_2ndO <- 65 #width of one 2nd order floodplain (ft)
 w_3rdO <- 75 #width of one 3rd order floodplain (ft)
 w_4thO <- 130 #width of one 4th order floodplain (ft)
 
-
+Xcs <- 50 #Distance between cross sections (ft)
 ```
 
 #Q1
