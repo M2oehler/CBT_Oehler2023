@@ -27,10 +27,10 @@ k <- 0.067 #0.0067 10th percentile
 Xcs <- 50 #Distance between cross sections (ft)
 
 
-w_1stO <- 60 #width of one 1st order floodplain (ft)
-w_2ndO <- 65 #width of one 2nd order floodplain (ft)
-w_3rdO <- 75 #width of one 3rd order floodplain (ft)
-w_4thO <- 130 #width of one 4th order floodplain (ft)
+#w_1stO <- 60 #width of one 1st order floodplain (ft)
+#w_2ndO <- 65 #width of one 2nd order floodplain (ft)
+#w_3rdO <- 75 #width of one 3rd order floodplain (ft)
+#w_4thO <- 130 #width of one 4th order floodplain (ft)
 
 
 ```
