@@ -34,13 +34,13 @@ load4 <- 2878440 #input load to the fourth order stream (grams)
 ##Read in data from text files:
 ```{r}
 #Make vector of file names, then convert to DF and include the location to use later to read in the files.
-raw.files <- tibble(filename = list.files("TextFiles1stO/"))
+raw.files <- tibble(filename = list.files("TextFiles2ndO/"))
 raw.file.paths <- raw.files  %>%
-  mutate(filepath = paste0("TextFiles1stO/", filename))
+  mutate(filepath = paste0("TextFiles2ndO/", filename))
 
 
 #Read in and combine files into one df (~15 min on Mac, ~10 min on DELL)
-NO3_1stO <- NULL
+NO3_2ndO <- NULL
 for (f in raw.file.paths$filepath) {
   dat <- read_fwf(f, 
                   skip = 12, 
@@ -48,13 +48,11 @@ for (f in raw.file.paths$filepath) {
                     col_names = c("reach", "STA", "day", "time", "wettedFPw")), 
                     col_types = cols(reach = "c", STA = "c", day = "c", time = "c", wettedFPw = "n")) %>%
          mutate(plan = f)
-   NO3_1stO <- bind_rows(NO3_1stO, dat)
+   NO3_2ndO <- bind_rows(NO3_2ndO, dat)
 }
 
-
-
 #Editing (Cant run separate wider or the sub string arguments multiple times. It will keep altering beyond the desired outcome)
-NO3_1stO <- NO3_1stO %>%
+NO3_2ndO <- NO3_2ndO %>%
   drop_na(STA) %>%
   mutate(STA = 
            case_when(
@@ -73,13 +71,14 @@ NO3_1stO <- NO3_1stO %>%
                                   ~ substr(plan, 1, nchar(plan)-6), 
                      TRUE 
                                   ~ substr(plan, 1, nchar(plan)-4))) 
-NO3_1stO$STA <- as.numeric(NO3_1stO$STA)
+
+NO3_2ndO$STA <- as.numeric(NO3_2ndO$STA)
 
 rm(dat, raw.file.paths, raw.files)
 
 #To save data frames in the environment
-#save(NO3_1stO, 
-#     file = "C:/Users/rjieh/CBT_Oehler2023/NO3_1stO_sort.RData")
+#save(NO3_1stO, NO3_2ndO, NO3_3rdO, NO3_4thO,
+ #    file = "C:/Users/morganao/Documents/CBT_Oehler2023/SO_NO3_calcs.RData")
 ```
 
 #%NO3 Removal by 1st Order River Restoration. Produces load removals in the entire order.
@@ -345,6 +344,475 @@ xls_1stO <- Q1stO %>%
 #             round,
 #             digits = 2)
 ```
+
+
+
+#%NO3 Removal by 2nd Order River Restoration. Produces load removals in the entire order.
+```{r}
+#write.csv(NO3_1stO, file = "Exports/NO3_1stO.csv")
+
+NO3_2ndO <- NO3_2ndO %>%
+  group_by(storm, plan, STA, river) %>%
+  mutate(
+    ti_min = case_when(wettedFPw >= 15 ~ 15)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(
+    FP_width = 
+           case_when(
+             river == "1-7" ~ 16.5,
+             plan == "unr" & river == "2-2" ~ 34.5, 
+             plan == "2nd-20p" & river == "2-2" & STA >= 156200 ~ 65,
+             plan == "2nd-20p" & river == "2-2" & STA < 156200 ~ 34.5,
+             plan == "2nd-40p" & river == "2-2" & STA >= 152900 ~ 65,
+             plan == "2nd-40p" & river == "2-2" & STA < 152900 ~ 34.5,
+             plan == "2nd-60p" & river == "2-2" & STA >= 149600 ~ 65,
+             plan == "2nd-60p" & river == "2-2" & STA < 149600 ~ 34.5,
+             plan == "2nd-80p" & river == "2-2" & STA >= 146300 ~ 65,
+             plan == "2nd-80p" & river == "2-2" & STA < 146300 ~ 34.5,
+             plan == "2nd-100p" & river == "2-2" ~ 65,
+             river == "3-1" ~ 67.5,
+             river == "4-1" ~ 126)) %>% 
+  mutate(
+    k10_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                    ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                    ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+                          
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                    ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+          
+                river == "4-1" & (STA < 101000)
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000)) %>% 
+   mutate(
+    km_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+                            
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+                          
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "4-1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000)) %>% 
+  mutate(
+    k90_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+                            
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+                          
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "4-1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000)) %>% 
+  group_by(storm, plan, river) %>%
+  summarise(removal_k10_g = sum(k10_removal_g),
+            removal_km_g = sum(km_removal_g),
+            removal_k90_g = sum(k90_removal_g)) %>%
+  mutate(removal_k10_g = case_when(river == "1-7" ~ removal_k10_g*24, 
+                                 river == "2-2" ~ removal_k10_g*6,
+                                 river == "3-1" ~ removal_k10_g*2,
+                                 river == "4-1" ~ removal_k10_g),
+         removal_km_g = case_when(river == "1-7" ~ removal_km_g*24, 
+                                 river == "2-2" ~ removal_km_g*6,
+                                 river == "3-1" ~ removal_km_g*2,
+                                 river == "4-1" ~ removal_km_g),
+         removal_k90_g = case_when(river == "1-7" ~ removal_k90_g*24, 
+                                 river == "2-2" ~ removal_k90_g*6,
+                                 river == "3-1" ~ removal_k90_g*2,
+                                 river == "4-1" ~ removal_k90_g)) %>%
+  mutate(order = 
+           case_when(            river == "1-7" ~ "1st", 
+                                 river == "2-2" ~ "2nd",
+                                 river == "3-1" ~ "3rd",
+                                 river == "4-1" ~ "4th")) %>% 
+  mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
+                                 endsWith(plan, "80p")~ 80,
+                                 endsWith(plan, "60p")~ 60,
+                                 endsWith(plan, "40p")~ 40,
+                                 endsWith(plan, "20p")~ 20,
+                                 endsWith(plan, "unr")~ 0)) %>%
+  mutate(k10_percentWLR = 
+           (removal_k10_g/watershed_load)*100,
+         km_percentWLR = 
+           (removal_km_g/watershed_load)*100,
+         k90_percentWLR = 
+           (removal_k90_g/watershed_load)*100) %>%
+  mutate(k10_percentOLR = 
+           case_when(river == "1-7" ~ (removal_k10_g/load1)*100, 
+                     river == "2-2" ~ (removal_k10_g/load2)*100,
+                     river == "3-1" ~ (removal_k10_g/load3)*100,
+                     river == "4-1" ~ (removal_k10_g/load4)*100),
+         km_percentOLR = 
+           case_when(river == "1-7" ~ (removal_km_g/load1)*100, 
+                     river == "2-2" ~ (removal_km_g/load2)*100,
+                     river == "3-1" ~ (removal_km_g/load3)*100,
+                     river == "4-1" ~ (removal_km_g/load4)*100),
+         k90_percentOLR = 
+           case_when(river == "1-7" ~ (removal_k90_g/load1)*100, 
+                     river == "2-2" ~ (removal_k90_g/load2)*100,
+                     river == "3-1" ~ (removal_k90_g/load3)*100,
+                     river == "4-1" ~ (removal_k90_g/load4)*100))
+
+#WLR= watershed load removed; OLR= order load removed
+  mutate_if(is.numeric, # Using dplyr functions
+            round,
+            digits = 2)
+```
+
+
+#%NO3 Removal by 3rd Order River Restoration. Produces load removals in the entire order.
+```{r}
+#write.csv(NO3_1stO, file = "Exports/NO3_1stO.csv")
+
+NO3_3rdO <- NO3_3rdO %>%
+  group_by(storm, plan, STA, river) %>%
+  mutate(
+    ti_min = case_when(wettedFPw >= 15 ~ 15)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(
+    FP_width = 
+           case_when(
+             river == "1-7" ~ 16.5,
+             river == "2-2" ~ 34.5,
+             plan == "unr" & river == "3-1" ~ 67.5, 
+             plan == "3rd-20p" & river == "3-1" & STA >= 134600 ~ 75,
+             plan == "3rd-20p" & river == "3-1" & STA < 134600 ~ 67.5,
+             plan == "3rd-40p" & river == "3-1" & STA >= 126200 ~ 75,
+             plan == "3rd-40p" & river == "3-1" & STA < 126200 ~ 67.5,
+             plan == "3rd-60p" & river == "3-1" & STA >= 117800 ~ 75,
+             plan == "3rd-60p" & river == "3-1" & STA < 117800 ~ 67.5,
+             plan == "3rd-80p" & river == "3-1" & STA >= 109400 ~ 75,
+             plan == "3rd-80p" & river == "3-1" & STA < 109400 ~ 67.5,
+             plan == "3rd-100p" & river == "3-1" ~ 75,
+             river == "4-1" ~ 126)) %>% 
+  mutate(
+    k10_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                    ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                    ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+                          
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                    ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+          
+                river == "4-1" & (STA < 101000)
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000)) %>% 
+   mutate(
+    km_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+                            
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+                          
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "4-1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000)) %>% 
+  mutate(
+    k90_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+                            
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+                          
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "4-1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000)) %>% 
+  group_by(storm, plan, river) %>%
+  summarise(removal_k10_g = sum(k10_removal_g),
+            removal_km_g = sum(km_removal_g),
+            removal_k90_g = sum(k90_removal_g)) %>%
+  mutate(removal_k10_g = case_when(river == "1-7" ~ removal_k10_g*24, 
+                                 river == "2-2" ~ removal_k10_g*6,
+                                 river == "3-1" ~ removal_k10_g*2,
+                                 river == "4-1" ~ removal_k10_g),
+         removal_km_g = case_when(river == "1-7" ~ removal_km_g*24, 
+                                 river == "2-2" ~ removal_km_g*6,
+                                 river == "3-1" ~ removal_km_g*2,
+                                 river == "4-1" ~ removal_km_g),
+         removal_k90_g = case_when(river == "1-7" ~ removal_k90_g*24, 
+                                 river == "2-2" ~ removal_k90_g*6,
+                                 river == "3-1" ~ removal_k90_g*2,
+                                 river == "4-1" ~ removal_k90_g)) %>%
+  mutate(order = 
+           case_when(            river == "1-7" ~ "1st", 
+                                 river == "2-2" ~ "2nd",
+                                 river == "3-1" ~ "3rd",
+                                 river == "4-1" ~ "4th")) %>% 
+  mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
+                                 endsWith(plan, "80p")~ 80,
+                                 endsWith(plan, "60p")~ 60,
+                                 endsWith(plan, "40p")~ 40,
+                                 endsWith(plan, "20p")~ 20,
+                                 endsWith(plan, "unr")~ 0)) %>%
+  mutate(k10_percentWLR = 
+           (removal_k10_g/watershed_load)*100,
+         km_percentWLR = 
+           (removal_km_g/watershed_load)*100,
+         k90_percentWLR = 
+           (removal_k90_g/watershed_load)*100) %>%
+  mutate(k10_percentOLR = 
+           case_when(river == "1-7" ~ (removal_k10_g/load1)*100, 
+                     river == "2-2" ~ (removal_k10_g/load2)*100,
+                     river == "3-1" ~ (removal_k10_g/load3)*100,
+                     river == "4-1" ~ (removal_k10_g/load4)*100),
+         km_percentOLR = 
+           case_when(river == "1-7" ~ (removal_km_g/load1)*100, 
+                     river == "2-2" ~ (removal_km_g/load2)*100,
+                     river == "3-1" ~ (removal_km_g/load3)*100,
+                     river == "4-1" ~ (removal_km_g/load4)*100),
+         k90_percentOLR = 
+           case_when(river == "1-7" ~ (removal_k90_g/load1)*100, 
+                     river == "2-2" ~ (removal_k90_g/load2)*100,
+                     river == "3-1" ~ (removal_k90_g/load3)*100,
+                     river == "4-1" ~ (removal_k90_g/load4)*100))
+
+#WLR= watershed load removed; OLR= order load removed
+  mutate_if(is.numeric, # Using dplyr functions
+            round,
+            digits = 2)
+```
+
+
+
+#%NO3 Removal by 4th Order River Restoration. Produces load removals in the entire order.
+```{r}
+#write.csv(NO3_1stO, file = "Exports/NO3_1stO.csv")
+
+NO3_4thO <- NO3_4thO %>%
+  group_by(storm, plan, STA, river) %>%
+  mutate(
+    ti_min = case_when(wettedFPw >= 15 ~ 15)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(
+    FP_width = 
+           case_when(
+             river == "1-7" ~ 16.5,
+             river == "2-2" ~ 34.5,
+             river == "3-1" ~ 67.5,
+             plan == "unr" & river == "4-1" ~ 126, 
+             plan == "4th-20p" & river == "4-1" & STA >= 80800 ~ 130,
+             plan == "4th-20p" & river == "4-1" & STA < 80800 ~ 126,
+             plan == "4th-40p" & river == "4-1" & STA >= 60600 ~ 130,
+             plan == "4th-40p" & river == "4-1" & STA < 60600 ~ 126,
+             plan == "4th-60p" & river == "4-1" & STA >= 40400 ~ 130,
+             plan == "4th-60p" & river == "4-1" & STA < 40400 ~ 126,
+             plan == "4th-80p" & river == "4-1" & STA >= 20200 ~ 130,
+             plan == "4th-80p" & river == "4-1" & STA < 20200 ~ 126,
+             plan == "4th-100p" & river == "4-1" ~ 130)) %>% 
+  mutate(
+    k10_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                    ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                    ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+                          
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                    ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+          
+                river == "4-1" & (STA < 101000)
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000)) %>% 
+   mutate(
+    km_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+                            
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+                          
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "4-1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000)) %>% 
+  mutate(
+    k90_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+                            
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+                          
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "4-1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000)) %>% 
+  group_by(storm, plan, river) %>%
+  summarise(removal_k10_g = sum(k10_removal_g),
+            removal_km_g = sum(km_removal_g),
+            removal_k90_g = sum(k90_removal_g)) %>%
+  mutate(removal_k10_g = case_when(river == "1-7" ~ removal_k10_g*24, 
+                                 river == "2-2" ~ removal_k10_g*6,
+                                 river == "3-1" ~ removal_k10_g*2,
+                                 river == "4-1" ~ removal_k10_g),
+         removal_km_g = case_when(river == "1-7" ~ removal_km_g*24, 
+                                 river == "2-2" ~ removal_km_g*6,
+                                 river == "3-1" ~ removal_km_g*2,
+                                 river == "4-1" ~ removal_km_g),
+         removal_k90_g = case_when(river == "1-7" ~ removal_k90_g*24, 
+                                 river == "2-2" ~ removal_k90_g*6,
+                                 river == "3-1" ~ removal_k90_g*2,
+                                 river == "4-1" ~ removal_k90_g)) %>%
+  mutate(order = 
+           case_when(            river == "1-7" ~ "1st", 
+                                 river == "2-2" ~ "2nd",
+                                 river == "3-1" ~ "3rd",
+                                 river == "4-1" ~ "4th")) %>% 
+  mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
+                                 endsWith(plan, "80p")~ 80,
+                                 endsWith(plan, "60p")~ 60,
+                                 endsWith(plan, "40p")~ 40,
+                                 endsWith(plan, "20p")~ 20,
+                                 endsWith(plan, "unr")~ 0)) %>%
+  mutate(k10_percentWLR = 
+           (removal_k10_g/watershed_load)*100,
+         km_percentWLR = 
+           (removal_km_g/watershed_load)*100,
+         k90_percentWLR = 
+           (removal_k90_g/watershed_load)*100) %>%
+  mutate(k10_percentOLR = 
+           case_when(river == "1-7" ~ (removal_k10_g/load1)*100, 
+                     river == "2-2" ~ (removal_k10_g/load2)*100,
+                     river == "3-1" ~ (removal_k10_g/load3)*100,
+                     river == "4-1" ~ (removal_k10_g/load4)*100),
+         km_percentOLR = 
+           case_when(river == "1-7" ~ (removal_km_g/load1)*100, 
+                     river == "2-2" ~ (removal_km_g/load2)*100,
+                     river == "3-1" ~ (removal_km_g/load3)*100,
+                     river == "4-1" ~ (removal_km_g/load4)*100),
+         k90_percentOLR = 
+           case_when(river == "1-7" ~ (removal_k90_g/load1)*100, 
+                     river == "2-2" ~ (removal_k90_g/load2)*100,
+                     river == "3-1" ~ (removal_k90_g/load3)*100,
+                     river == "4-1" ~ (removal_k90_g/load4)*100))
+
+#WLR= watershed load removed; OLR= order load removed
+  mutate_if(is.numeric, # Using dplyr functions
+            round,
+            digits = 2)
+
+```
+
 
 #Preparing data for plotting... dont use this anymore just keep in one DF
 ```{r}
