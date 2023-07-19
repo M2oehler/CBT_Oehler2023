@@ -1,0 +1,607 @@
+---
+title: "1 km Restoration"
+output: html_document
+date: "2023-07-03"
+---
+
+#Housekeeping:
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(dplyr)
+library(tidyverse)
+library(stringr)
+library(tidyr)
+library(readr)
+
+theme_set(theme_classic())
+
+#removal rates in mg-N/ft2.hr. Converted to g in the removal calc below.
+k10 <- 0.0067
+km <- 0.061
+k90 <- 1.3
+Xcs <- 50 #Distance between cross sections (ft)
+```
+
+
+#Incremental 1st- Order Restoration
+##Read in data from text files:
+```{r}
+#Make vector of file names, then convert to DF and include the location to use later to read in the files.
+raw.files <- tibble(filename = list.files("TextFileskm/"))
+raw.file.paths <- raw.files  %>%
+  mutate(filepath = paste0("TextFileskm/", filename))
+
+
+#Read in and combine files into one df (~15 min on Mac, ~10 min on DELL)
+RAS_km <- NULL
+for (f in raw.file.paths$filepath) {
+  dat <- read_fwf(f, 
+                  skip = 12, 
+                  fwf_widths(c(10, 20, 15, 4, 9),
+                    col_names = c("reach", "STA", "day", "time", "wettedFPw")), 
+                    col_types = cols(reach = "c", STA = "c", day = "c", time = "c", wettedFPw = "n")) %>%
+         mutate(plan = f)
+   RAS_km <- bind_rows(RAS_km, dat)
+}
+
+#Editing (Cant run separate wider or the sub string arguments multiple times. It will keep altering beyond the desired outcome)
+RAS_km <- RAS_km %>%
+  drop_na(STA) %>%
+  mutate(STA = 
+           case_when(
+             endsWith(STA, ".*") ~ substr(STA, 1, nchar(STA)-2),
+             endsWith(STA, ".0*") ~ substr(STA, 1, nchar(STA)-3),
+             endsWith(STA, ".00*") ~ substr(STA, 1, nchar(STA)-4),
+             TRUE ~ STA) ) %>%
+  separate_wider_delim(plan, 
+                       delim = "_", names = c("river", "storm", "plan")) %>%
+  mutate(river = 
+           substring(river,
+                     first = 13,
+                     last = 15), 
+         plan = 
+           case_when(river == "3-1" | river == "4-1" 
+                                  ~ substr(plan, 1, nchar(plan)-6), 
+                     TRUE 
+                                  ~ substr(plan, 1, nchar(plan)-4))) 
+
+RAS_km$STA <- as.numeric(RAS_km$STA)
+
+rm(dat, raw.file.paths, raw.files)
+
+#To save data frames in the environment
+save(RAS_km, 
+    file = "C:/Users/morganao/Documents/CBT_Oehler2023/Saved_Dataframes/km_RAS_rawData.RData")
+save(unr_rem, NO3_km,
+    file = "C:/Users/morganao/Documents/CBT_Oehler2023/9_Saved_Dataframes/km_NO3_Data.RData")
+
+```
+
+```{r}
+#Removal from 1km scenarios is only from 1 reach! Not scaled by the number of rivers within each order bc there is only one restored section.
+
+#Calculate removal loads first from rivers along a flow path:
+NO3_km <- RAS_km %>%
+  group_by(storm, plan, STA, river) %>%
+  mutate(
+    ti_min = case_when(wettedFPw >= 15 ~ 15)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(
+    FP_width = 
+           case_when(
+             plan == "unr" & river == "1-7" ~ 16.5, 
+             plan == "unr" & river == "2-2" ~ 34.5,
+             plan == "unr" & river == "3-1" ~ 67.5,
+             plan == "unr" & river == "4-1" ~ 126,
+             
+             plan == "1st-1km" & river == "1-7" & STA >= 163850 ~ 60, #using US location for now bc dont know what luke did for 1st-1km
+             plan == "1st-1km" & river == "1-7" & STA < 163850 ~ 16.5,
+             plan == "1st-1km" & river == "2-2" ~ 34.5,
+             plan == "1st-1km" & river == "3-1" ~ 67.5,
+             plan == "1st-1km" & river == "4-1" ~ 126,
+             
+             plan == "2nd-1km" & river == "1-7" ~ 16.5, 
+             plan == "2nd-1km" & river == "2-2" & STA > 152800 ~ 34.5,
+             plan == "2nd-1km" & river == "2-2" & STA <= 152800 & STA >= 149600 ~ 65,
+             plan == "2nd-1km" & river == "2-2" & STA < 149600 ~ 34.5,
+             plan == "2nd-1km" & river == "3-1" ~ 67.5,
+             plan == "2nd-1km" & river == "4-1" ~ 126,
+             
+             plan == "3rd-1km" & river == "1-7" ~ 16.5,
+             plan == "3rd-1km" & river == "2-2" ~ 34.5,
+             plan == "3rd-1km" & river == "3-1" & STA > 123650 ~ 67.5,
+             plan == "3rd-1km" & river == "3-1" & STA <= 123650 & STA >= 120350 ~ 75,
+             plan == "3rd-1km" & river == "3-1" & STA < 120350 ~ 67.5,
+             plan == "3rd-1km" & river == "4-1" ~ 126,
+             
+             plan == "4th-1km" & river == "1-7" ~ 16.5,
+             plan == "4th-1km" & river == "2-2" ~ 34.5,
+             plan == "4th-1km" & river == "3-1" ~ 67.5,
+             plan == "4th-1km" & river == "4-1" & STA > 52150 ~ 126,
+             plan == "4th-1km" & river == "4-1" & STA <= 52150 & STA >= 48850 ~ 130,
+             plan == "4th-1km" & river == "4-1" & STA < 48850 ~ 126)) %>% 
+  mutate(
+    k10_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                    ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                    ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+                          
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                    ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+          
+                river == "4-1" & (STA < 101000)
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000)) %>% 
+   mutate(
+    km_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+                            
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+                          
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "4-1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000)) %>% 
+  mutate(
+    k90_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+                            
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+                          
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "4-1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000)) 
+  
+NO3_km <- NO3_km%>%
+  group_by(storm, plan) %>%
+  summarise(removal_k10_g = sum(removal_k10_g), #summing removal from XS within a single river along a flow path.
+            removal_km_g = sum(removal_km_g),
+            removal_k90_g = sum(removal_k90_g))
+
+#Identify loads removed from the un-restored rivers. This is to supplement the removal calculated in the rivers along the extracted flow path where restoration occurs. The values in the table can be scaled by how many other rivers there are in each order (not including the rivers along the selected flow path from 1st to 4th):
+# unr_rem <- NO3_km%>%
+#   filter(plan == "unr")
+
+#Nitrate loads for 1mg/L source concentration(g)
+Q2_watershed_load <- 4563108 #total NO3 load to the watershed (grams)
+Q2_load1 <- 141902 #input load to a all first order streams (grams)
+Q2_load2 <- 120581 #input load to a all second order streams (grams)
+Q2_load3 <- 680432 #input load to a all third order streams (grams)
+Q2_load4 <- 3620193 #input load to the fourth order stream (grams)
+
+Q1_watershed_load <- 3653361 #total NO3 load to the watershed (grams)
+Q1_load1 <- 102974 #input load to a all first order streams (grams)
+Q1_load2 <- 126125 #input load to a all second order streams (grams)
+Q1_load3 <- 545822 #input load to a all third order streams (grams)
+Q1_load4 <- 2878440 #input load to the fourth order stream (grams)
+
+Q0.5_watershed_load <- 2262609 #total NO3 load to the watershed (grams)
+Q0.5_load1 <- 91515 #input load to a all first order streams (grams)
+Q0.5_load2 <- 74539 #input load to a all second order streams (grams)
+Q0.5_load3 <- 325804 #input load to a all third order streams (grams)
+Q0.5_load4 <- 1770751 #input load to the fourth order stream (grams)
+
+Qm_watershed_load <- 245161 #total NO3 load to the watershed (grams)
+Qm_load1 <- 65880 #input load to a all first order streams (grams)
+Qm_load2 <- 3003 #input load to a all second order streams (grams)
+Qm_load3 <- 26865 #input load to a all third order streams (grams)
+Qm_load4 <- 149414 #input load to the fourth order stream (grams)
+
+#Calculate total watershed removal percentages
+NO3_km <- NO3_km %>%
+  mutate(RestPathLoc_Km = case_when(startsWith(plan, "1st")~ 0.5,
+                                 startsWith(plan, "2nd")~ 4.345,
+                                 startsWith(plan, "3rd")~ 13.265,
+                                 startsWith(plan, "4th")~ 35.065,
+                                 startsWith(plan, "unr")~ 0)) %>%
+  mutate(Restoration_Location = case_when(startsWith(plan, "1st")~ "top_1-7",
+                                 startsWith(plan, "2nd")~ "middle_2-2",
+                                 startsWith(plan, "3rd")~ "middle_3-1",
+                                 startsWith(plan, "4th")~ "middle_4-1",
+                                 startsWith(plan, "unr")~ "none")) %>%
+  mutate(k10_percentWLR = case_when(storm == "Q2" ~ #adding on removal from unrestored rivers in the watershed
+                                   ((removal_k10_g + 
+                                       unr_rem$removal_k10_g[9]*23 + 
+                                       unr_rem$removal_k10_g[10]*5 +
+                                       unr_rem$removal_k10_g[11])/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   ((removal_k10_g +
+                                      unr_rem$removal_k10_g[5]*23 + 
+                                       unr_rem$removal_k10_g[6]*5 +
+                                       unr_rem$removal_k10_g[7])/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   ((removal_k10_g +
+                                      unr_rem$removal_k10_g[1]*23 + 
+                                       unr_rem$removal_k10_g[2]*5 +
+                                       unr_rem$removal_k10_g[3])/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   ((removal_k10_g +
+                                      unr_rem$removal_k10_g[13]*23 + 
+                                       unr_rem$removal_k10_g[14]*5 +
+                                       unr_rem$removal_k10_g[15])/Qm_watershed_load)*100),
+         km_percentWLR = case_when(storm == "Q2" ~
+                                   ((removal_km_g + 
+                                       unr_rem$removal_km_g[9]*23 + 
+                                       unr_rem$removal_km_g[10]*5 +
+                                       unr_rem$removal_km_g[11])/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   ((removal_km_g +
+                                       unr_rem$removal_km_g[5]*23 + 
+                                       unr_rem$removal_km_g[6]*5 +
+                                       unr_rem$removal_km_g[7])/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   ((removal_km_g +
+                                       unr_rem$removal_km_g[1]*23 + 
+                                       unr_rem$removal_km_g[2]*5 +
+                                       unr_rem$removal_km_g[3])/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   ((removal_km_g +
+                                       unr_rem$removal_km_g[13]*23 + 
+                                       unr_rem$removal_km_g[14]*5 +
+                                       unr_rem$removal_km_g[15])/Qm_watershed_load)*100),
+         k90_percentWLR = case_when(storm == "Q2" ~
+                                   ((removal_k90_g + 
+                                       unr_rem$removal_k90_g[9]*23 + 
+                                       unr_rem$removal_k90_g[10]*5 +
+                                       unr_rem$removal_k90_g[11])/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   ((removal_k90_g +
+                                       unr_rem$removal_k90_g[5]*23 + 
+                                       unr_rem$removal_k90_g[6]*5 +
+                                       unr_rem$removal_k90_g[7])/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   ((removal_k90_g +
+                                       unr_rem$removal_k90_g[1]*23 + 
+                                       unr_rem$removal_k90_g[2]*5 +
+                                       unr_rem$removal_k90_g[3])/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   ((removal_k90_g +
+                                       unr_rem$removal_k90_g[13]*23 + 
+                                       unr_rem$removal_k90_g[14]*5 +
+                                        unr_rem$removal_k90_g[15])/Qm_watershed_load)*100)) 
+
+#Nitrate loads for 2mg/L source concentration(g)
+Q2_watershed_load <- 9126217 #total NO3 load to the watershed (grams)
+Q2_load1 <- 283805 #input load to a all first order streams (grams)
+Q2_load2 <- 241163 #input load to a all second order streams (grams)
+Q2_load3 <- 1360864 #input load to a all third order streams (grams)
+Q2_load4 <- 7240386 #input load to the fourth order stream (grams)
+
+Q1_watershed_load <- 7306722 #total NO3 load to the watershed (grams)
+Q1_load1 <- 205948 #input load to a all first order streams (grams)
+Q1_load2 <- 252249 #input load to a all second order streams (grams)
+Q1_load3 <- 1091643 #input load to a all third order streams (grams)
+Q1_load4 <- 5756881 #input load to the fourth order stream (grams)
+
+Q0.5_watershed_load <- 4525219 #total NO3 load to the watershed (grams)
+Q0.5_load1 <- 183030 #input load to a all first order streams (grams)
+Q0.5_load2 <- 149078 #input load to a all second order streams (grams)
+Q0.5_load3 <- 651608 #input load to a all third order streams (grams)
+Q0.5_load4 <- 3541503 #input load to the fourth order stream (grams)
+
+Qm_watershed_load <- 490322 #total NO3 load to the watershed (grams)
+Qm_load1 <- 131760 #input load to a all first order streams (grams)
+Qm_load2 <- 6005 #input load to a all second order streams (grams)
+Qm_load3 <- 53730 #input load to a all third order streams (grams)
+Qm_load4 <- 298827 #input load to the fourth order stream (grams)
+
+NO3_km <- NO3_km %>%
+   mutate(k10_pWLR_2mgL = case_when(storm == "Q2" ~ #adding on removal from unrestored rivers in the watershed
+                                   ((removal_k10_g + 
+                                       unr_rem$removal_k10_g[9]*23 + 
+                                       unr_rem$removal_k10_g[10]*5 +
+                                       unr_rem$removal_k10_g[11])/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   ((removal_k10_g +
+                                      unr_rem$removal_k10_g[5]*23 + 
+                                       unr_rem$removal_k10_g[6]*5 +
+                                       unr_rem$removal_k10_g[7])/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   ((removal_k10_g +
+                                      unr_rem$removal_k10_g[1]*23 + 
+                                       unr_rem$removal_k10_g[2]*5 +
+                                       unr_rem$removal_k10_g[3])/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   ((removal_k10_g +
+                                      unr_rem$removal_k10_g[13]*23 + 
+                                       unr_rem$removal_k10_g[14]*5 +
+                                       unr_rem$removal_k10_g[15])/Qm_watershed_load)*100),
+         km_pWLR_2mgL = case_when(storm == "Q2" ~
+                                   ((removal_km_g + 
+                                       unr_rem$removal_km_g[9]*23 + 
+                                       unr_rem$removal_km_g[10]*5 +
+                                       unr_rem$removal_km_g[11])/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   ((removal_km_g +
+                                       unr_rem$removal_km_g[5]*23 + 
+                                       unr_rem$removal_km_g[6]*5 +
+                                       unr_rem$removal_km_g[7])/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   ((removal_km_g +
+                                       unr_rem$removal_km_g[1]*23 + 
+                                       unr_rem$removal_km_g[2]*5 +
+                                       unr_rem$removal_km_g[3])/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   ((removal_km_g +
+                                       unr_rem$removal_km_g[13]*23 + 
+                                       unr_rem$removal_km_g[14]*5 +
+                                       unr_rem$removal_km_g[15])/Qm_watershed_load)*100),
+         k90_pWLR_2mgL = case_when(storm == "Q2" ~
+                                   ((removal_k90_g + 
+                                       unr_rem$removal_k90_g[9]*23 + 
+                                       unr_rem$removal_k90_g[10]*5 +
+                                       unr_rem$removal_k90_g[11])/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   ((removal_k90_g +
+                                       unr_rem$removal_k90_g[5]*23 + 
+                                       unr_rem$removal_k90_g[6]*5 +
+                                       unr_rem$removal_k90_g[7])/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   ((removal_k90_g +
+                                       unr_rem$removal_k90_g[1]*23 + 
+                                       unr_rem$removal_k90_g[2]*5 +
+                                       unr_rem$removal_k90_g[3])/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   ((removal_k90_g +
+                                       unr_rem$removal_k90_g[13]*23 + 
+                                       unr_rem$removal_k90_g[14]*5 +
+                                        unr_rem$removal_k90_g[15])/Qm_watershed_load)*100))
+
+#Nitrate loads for 0.5mg/L source concentration(g)
+Q2_watershed_load <- 2281554 #total NO3 load to the watershed (grams)
+Q2_load1 <- 70951 #input load to a all first order streams (grams)
+Q2_load2 <- 60291 #input load to a all second order streams (grams)
+Q2_load3 <- 340216 #input load to a all third order streams (grams)
+Q2_load4 <- 1810096 #input load to the fourth order stream (grams)
+
+Q1_watershed_load <- 1826680 #total NO3 load to the watershed (grams)
+Q1_load1 <- 51487 #input load to a all first order streams (grams)
+Q1_load2 <- 63062 #input load to a all second order streams (grams)
+Q1_load3 <- 272911 #input load to a all third order streams (grams)
+Q1_load4 <- 1439220 #input load to the fourth order stream (grams)
+
+Q0.5_watershed_load <- 1131305 #total NO3 load to the watershed (grams)
+Q0.5_load1 <- 45757 #input load to a all first order streams (grams)
+Q0.5_load2 <- 37270 #input load to a all second order streams (grams)
+Q0.5_load3 <- 162902 #input load to a all third order streams (grams)
+Q0.5_load4 <- 885376 #input load to the fourth order stream (grams)
+
+Qm_watershed_load <- 122581 #total NO3 load to the watershed (grams)
+Qm_load1 <- 32940 #input load to a all first order streams (grams)
+Qm_load2 <- 1501 #input load to a all second order streams (grams)
+Qm_load3 <- 13432 #input load to a all third order streams (grams)
+Qm_load4 <- 74707 #input load to the fourth order stream (grams)
+
+NO3_km <- NO3_km %>%
+   mutate(k10_pWLR_.5mgL = case_when(storm == "Q2" ~ #adding on removal from unrestored rivers in the watershed
+                                   ((removal_k10_g + 
+                                       unr_rem$removal_k10_g[9]*23 + 
+                                       unr_rem$removal_k10_g[10]*5 +
+                                       unr_rem$removal_k10_g[11])/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   ((removal_k10_g +
+                                      unr_rem$removal_k10_g[5]*23 + 
+                                       unr_rem$removal_k10_g[6]*5 +
+                                       unr_rem$removal_k10_g[7])/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   ((removal_k10_g +
+                                      unr_rem$removal_k10_g[1]*23 + 
+                                       unr_rem$removal_k10_g[2]*5 +
+                                       unr_rem$removal_k10_g[3])/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   ((removal_k10_g +
+                                      unr_rem$removal_k10_g[13]*23 + 
+                                       unr_rem$removal_k10_g[14]*5 +
+                                       unr_rem$removal_k10_g[15])/Qm_watershed_load)*100),
+         km_pWLR_.5mgL = case_when(storm == "Q2" ~
+                                   ((removal_km_g + 
+                                       unr_rem$removal_km_g[9]*23 + 
+                                       unr_rem$removal_km_g[10]*5 +
+                                       unr_rem$removal_km_g[11])/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   ((removal_km_g +
+                                       unr_rem$removal_km_g[5]*23 + 
+                                       unr_rem$removal_km_g[6]*5 +
+                                       unr_rem$removal_km_g[7])/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   ((removal_km_g +
+                                       unr_rem$removal_km_g[1]*23 + 
+                                       unr_rem$removal_km_g[2]*5 +
+                                       unr_rem$removal_km_g[3])/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   ((removal_km_g +
+                                       unr_rem$removal_km_g[13]*23 + 
+                                       unr_rem$removal_km_g[14]*5 +
+                                       unr_rem$removal_km_g[15])/Qm_watershed_load)*100),
+         k90_pWLR_.5mgL = case_when(storm == "Q2" ~
+                                   ((removal_k90_g + 
+                                       unr_rem$removal_k90_g[9]*23 + 
+                                       unr_rem$removal_k90_g[10]*5 +
+                                       unr_rem$removal_k90_g[11])/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   ((removal_k90_g +
+                                       unr_rem$removal_k90_g[5]*23 + 
+                                       unr_rem$removal_k90_g[6]*5 +
+                                       unr_rem$removal_k90_g[7])/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   ((removal_k90_g +
+                                       unr_rem$removal_k90_g[1]*23 + 
+                                       unr_rem$removal_k90_g[2]*5 +
+                                       unr_rem$removal_k90_g[3])/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   ((removal_k90_g +
+                                       unr_rem$removal_k90_g[13]*23 + 
+                                       unr_rem$removal_k90_g[14]*5 +
+                                        unr_rem$removal_k90_g[15])/Qm_watershed_load)*100))
+
+
+NO3_km <- NO3_km%>% #Calculating additional removal due to implementing the restoration with  1mgL bg conc
+  mutate(k10_diff_Unr1mgL = case_when(storm == "Q2" ~  k10_percentWLR - NO3_km$k10_percentWLR[15],
+                                    storm == "Q1" ~  k10_percentWLR - NO3_km$k10_percentWLR[10],
+                                    storm == "Q0.5" ~  k10_percentWLR - NO3_km$k10_percentWLR[5],
+                                    storm == "Qm" ~  k10_percentWLR - NO3_km$k10_percentWLR[20]),
+        km_diff_Unr1mgL = case_when(storm == "Q2" ~  km_percentWLR - NO3_km$km_percentWLR[15],
+                                    storm == "Q1" ~  km_percentWLR - NO3_km$km_percentWLR[10],
+                                    storm == "Q0.5" ~  km_percentWLR - NO3_km$km_percentWLR[5],
+                                    storm == "Qm" ~  km_percentWLR - NO3_km$km_percentWLR[20]),
+        k90_diff_Unr1mgL = case_when(storm == "Q2" ~  k90_percentWLR - NO3_km$k90_percentWLR[15],
+                                    storm == "Q1" ~  k90_percentWLR - NO3_km$k90_percentWLR[10],
+                                    storm == "Q0.5" ~  k90_percentWLR - NO3_km$k90_percentWLR[5],
+                                    storm == "Qm" ~  k90_percentWLR - NO3_km$k90_percentWLR[20]))
+
+NO3_km$k10_diff_Unr1mgL <- pmax(NO3_km$k10_diff_Unr1mgL,0) #not allowing negative values to exist. The differences are so slim.
+NO3_km$km_diff_Unr1mgL <- pmax(NO3_km$km_diff_Unr1mgL,0)
+NO3_km$k90_diff_Unr1mgL <- pmax(NO3_km$k90_diff_Unr1mgL,0)
+
+NO3_km$storm <- factor(NO3_km$storm,                 # Re-level group factor
+                         levels = c("Q2", "Q1", "Q0.5", "Qm"))
+NO3_km$Restoration_Location <- factor(NO3_km$Restoration_Location,                 # Re-level group factor
+                         levels = c("none", "top_1-7", "middle_2-2", "middle_3-1", "middle_4-1"))
+
+#WLR= watershed load removed; OLR= order load removed
+  # mutate_if(is.numeric, # Using dplyr functions
+  #           round,
+  #           digits = 3)
+            
+```
+
+```{r}
+plot_Kmkm <- NO3_km %>%
+  group_by(storm,plan, RestPathLoc_Km, Restoration_Location)%>%
+  summarise(km_percentWLR = sum(km_percentWLR))%>%
+  ggplot()+
+  geom_line((aes(RestPathLoc_Km, km_percentWLR, color = storm, group = storm)))+
+  geom_point(aes(RestPathLoc_Km, km_percentWLR,color = storm, shape = Restoration_Location))+
+  xlab("Location of 1km restoration \n along the flowpath (km)")+
+  ylab("Percent of Total Watershed Load Removed")+
+  ggtitle("km")+
+  theme(aspect.ratio = 1)+
+  theme(legend.spacing.y = unit(0.2, 'cm'))
+
+plot_Kmk90 <- NO3_km %>%
+  group_by(storm, plan, RestPathLoc_Km, Restoration_Location)%>%
+  summarise(k90_percentWLR = sum(k90_percentWLR))%>%
+  ggplot()+
+  geom_line(aes(RestPathLoc_Km, k90_percentWLR, color = storm, group = storm))+
+  geom_point(aes(RestPathLoc_Km, k90_percentWLR, color = storm, shape = Restoration_Location))+
+  xlab("Location of 1km restoration \n along the flowpath (km)")+
+  ylab("Percent of Total Watershed Load Removed")+
+  ggtitle("k90")+
+  theme(aspect.ratio = 1)+
+  theme(legend.spacing.y = unit(0.2, 'cm'))
+
+plot_Kmk10 <- NO3_km %>%
+  group_by(storm,plan, RestPathLoc_Km, Restoration_Location)%>%
+  summarise(k10_percentWLR = sum(k10_percentWLR))%>%
+  ggplot()+
+  geom_line(aes(RestPathLoc_Km, k10_percentWLR, color = storm, group = storm))+
+  geom_point(aes(RestPathLoc_Km, k10_percentWLR, color = storm, shape = Restoration_Location))+
+  xlab("Location of 1km restoration \n along the flowpath (km)")+
+  ylab("Percent of Total Watershed Load Removed")+
+  ggtitle("k10")+
+  theme(aspect.ratio = 1)+
+  theme(legend.spacing.y = unit(0.2, 'cm'))
+
+plot_Kmk10 + theme(text = element_text(size = 7)) + plot_Kmkm + theme(text = element_text(size = 7)) +
+  plot_Kmk90 + theme(text = element_text(size = 7)) +
+  plot_layout(ncol = 3, guides = "collect")+
+            plot_annotation(title = 'Watershed NO3 Removal due to 1km Restoration',
+                            #caption = 'Total flow path length from river 1-7 to 4-1 outlet = 50.4 Km',
+                            theme = theme(title = element_text(size = 8, face = 2))) 
+
+
+ggsave("Exports/1km.png", dpi=500)
+```
+
+#% benefit of 1 km restoration projects compared to unrestored conditions
+```{r}
+
+plot_1kmdiff_km <- NO3_km %>%
+  group_by(storm,plan, RestPathLoc_Km, Restoration_Location)%>%
+  summarise(km_diff_Unr1mgL = sum(km_diff_Unr1mgL))%>%
+  ggplot()+
+  geom_line(aes(RestPathLoc_Km, km_diff_Unr1mgL, color = storm))+
+  geom_point(aes(RestPathLoc_Km, km_diff_Unr1mgL, color = storm, shape = Restoration_Location))+
+  xlab("Location of 1km restoration \n along the flowpath (km)")+
+  ylab("% Watershed NO3 Removed \n by 1km Length of Restoration")+
+  ggtitle("km")+
+  theme(aspect.ratio = 1)+
+  theme(legend.spacing.y = unit(0.2, 'cm'))
+
+plot_1kmdiff_k90 <- NO3_km %>%
+  group_by(storm,plan, RestPathLoc_Km, Restoration_Location)%>%
+  summarise(k90_diff_Unr1mgL = sum(k90_diff_Unr1mgL))%>%
+  ggplot()+
+  geom_line(aes(RestPathLoc_Km, k90_diff_Unr1mgL, color = storm))+
+  geom_point(aes(RestPathLoc_Km, k90_diff_Unr1mgL, color = storm, shape = Restoration_Location))+
+  xlab("Location of 1km restoration \n along the flowpath (km)")+
+  ylab("% Watershed NO3 Removed \n by 1km Length of Restoration")+
+  ggtitle("k90")+
+  theme(aspect.ratio = 1)+
+  theme(legend.spacing.y = unit(0.2, 'cm'))
+
+plot_1kmdiff_k10 <- NO3_km %>%
+  group_by(storm,plan, RestPathLoc_Km, Restoration_Location)%>%
+  summarise(k10_diff_Unr1mgL = sum(k10_diff_Unr1mgL))%>%
+  ggplot()+
+  geom_line(aes(RestPathLoc_Km, k10_diff_Unr1mgL, color = storm))+
+  geom_point(aes(RestPathLoc_Km, k10_diff_Unr1mgL, color = storm, shape = Restoration_Location))+
+  xlab("Location of 1km restoration \n along the flowpath (km)")+
+  ylab("% Watershed NO3 Removed \n by 1km Length of Restoration")+
+  ggtitle("k10")+
+  theme(aspect.ratio = 1)+
+  theme(legend.spacing.y = unit(0.2, 'cm'))
+
+plot_1kmdiff_k10 + theme(text = element_text(size = 7)) + plot_1kmdiff_km + theme(text = element_text(size = 7)) +
+  plot_1kmdiff_k90 + theme(text = element_text(size = 7)) +
+  plot_layout(ncol = 3, guides = "collect")+
+            plot_annotation(title = 'Additional Benefit in NO3 Removal produced by 1 Km Length Restoration',
+                            theme = theme(title = element_text(size = 8, face = 2)))
+
+ggsave("Exports/1km_addBenefit.png", dpi=500)
+```
+

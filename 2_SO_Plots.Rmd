@@ -1,0 +1,2155 @@
+---
+title: "Single Order restoration plots"
+output: html_document
+date: "2023-06-23"
+---
+##Creating a 4x4 matrix plot wrt watershed load (percent nitrate removed from the watershed) or local load (percent nitrate removed from a river order with respect to the load entering the respective order). Plot by river outlet.
+
+#Housekeeping
+```{r}
+library(patchwork)
+```
+
+#Plotting Loads to the Watershed
+```{r}
+# OrderLoads_kg <- data.frame(Order = c(1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4),
+#                             Load = c(141.9, 103, 91.5, 65.9, 120.6,126.2,74.5,3,680.4,545.8,325.8,26.9,3620.2,2878.4,1770.8,149.5),
+#                             storm = c("Q2", "Q1", "Q0.5", "Qm", "Q2", "Q1", "Q0.5", "Qm", "Q2", "Q1", "Q0.5", "Qm", "Q2", "Q1", "Q0.5", "Qm"))
+# 
+# OrderLoads_kg$storm <- factor(OrderLoads_kg$storm,                 # Re-level group factor
+#                          levels = c("Q2", "Q1", "Q0.5", "Qm"))
+# OrderLoads_kg%>%ggplot()+
+#   geom_line(aes(Order, Load,color = storm))+
+#   geom_point(aes(Order, Load,color = storm))+
+#   xlab("River Order")+
+#   ylab("Total NO3 Load (kg)")+
+#   ggtitle("Total NO3 Load to the Watershed by River Order")
+# ggsave("Exports/OrderLoadsKg.png", dpi=500, height=4, width=5, units="in")
+# 
+# OrderLoads_kg$storm <- factor(OrderLoads_kg$storm,                 # Re-level group factor
+#                          levels = c("Qm", "Q0.5", "Q1", "Q2"))
+# OrderLoads_kg %>%
+#   group_by(storm)%>%
+#   summarise(totLoad = sum(Load))%>%
+#   ggplot()+
+#   geom_line(aes(storm, totLoad, group = 1))+
+#   geom_point(aes(storm, totLoad))+
+#   xlab("Storm Size")+
+#   ylab("Total NO3 Load (kg)")+
+#   ggtitle("Total NO3 Load to the Watershed by Storm")
+# ggsave("Exports/WatershedLoadsKg.png", dpi=500, height=4, width=5, units="in")
+```
+
+
+```{r}
+# Reordering storms so plots have them in order
+NO3_1stO$storm <- factor(NO3_1stO$storm,                 # Re-level group factor
+                         levels = c("Q2", "Q1", "Q0.5", "Qm"))
+NO3_2ndO$storm <- factor(NO3_2ndO$storm,                 # Re-level group factor
+                         levels = c("Q2", "Q1", "Q0.5", "Qm"))
+NO3_3rdO$storm <- factor(NO3_3rdO$storm,                 # Re-level group factor
+                         levels = c("Q2", "Q1", "Q0.5", "Qm"))
+NO3_4thO$storm <- factor(NO3_4thO$storm,                 # Re-level group factor
+                         levels = c("Q2", "Q1", "Q0.5", "Qm"))
+
+NO3_1stO <-   NO3_1stO %>% 
+    transform(k10_PerCumRem = ave(k10_percentWLR, storm, plan, FUN = cumsum),
+              km_PerCumRem = ave(km_percentWLR, storm, plan, FUN = cumsum),
+              k90_PerCumRem = ave(k90_percentWLR, storm, plan, FUN = cumsum)) %>%
+    transform(k90_.5PerCumRem = ave(k90_pWLR_.5mgL, storm, plan, FUN = cumsum),
+              k90_2PerCumRem = ave(k90_pWLR_2mgL, storm, plan, FUN = cumsum))
+
+NO3_2ndO <-   NO3_2ndO %>% 
+    transform(k10_PerCumRem = ave(k10_percentWLR, storm, plan, FUN = cumsum),
+              km_PerCumRem = ave(km_percentWLR, storm, plan, FUN = cumsum),
+              k90_PerCumRem = ave(k90_percentWLR, storm, plan, FUN = cumsum))%>%
+    transform(k90_.5PerCumRem = ave(k90_pWLR_.5mgL, storm, plan, FUN = cumsum),
+              k90_2PerCumRem = ave(k90_pWLR_2mgL, storm, plan, FUN = cumsum))
+
+NO3_3rdO <-   NO3_3rdO %>% 
+    transform(k10_PerCumRem = ave(k10_percentWLR, storm, plan, FUN = cumsum),
+              km_PerCumRem = ave(km_percentWLR, storm, plan, FUN = cumsum),
+              k90_PerCumRem = ave(k90_percentWLR, storm, plan, FUN = cumsum))%>%
+    transform(k90_.5PerCumRem = ave(k90_pWLR_.5mgL, storm, plan, FUN = cumsum),
+              k90_2PerCumRem = ave(k90_pWLR_2mgL, storm, plan, FUN = cumsum))
+
+NO3_4thO <-   NO3_4thO %>% 
+    transform(k10_PerCumRem = ave(k10_percentWLR, storm, plan, FUN = cumsum),
+              km_PerCumRem = ave(km_percentWLR, storm, plan, FUN = cumsum),
+              k90_PerCumRem = ave(k90_percentWLR, storm, plan, FUN = cumsum))%>%
+    transform(k90_.5PerCumRem = ave(k90_pWLR_.5mgL, storm, plan, FUN = cumsum),
+              k90_2PerCumRem = ave(k90_pWLR_2mgL, storm, plan, FUN = cumsum))
+
+group_keys(NO3_1stO)
+
+save(NO3_1stO, NO3_2ndO, NO3_3rdO, NO3_4thO,
+    file = "C:/Users/morganao/Documents/CBT_Oehler2023/9_Saved_Dataframes/SO_cumu_plot_df.RData")
+```
+
+#watershed removal- cumulative
+```{r}
+#1
+one <- NO3_1stO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%NO3 Removed \n U.S. of 1st order outlets")+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,1)+
+        theme(aspect.ratio = 1)
+#5
+five <- NO3_1stO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%NO3 Removed \n U.S. of 2nd order outlets")+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,1)+
+        theme(aspect.ratio = 1)
+#9
+nine <- NO3_1stO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%NO3 Removed\n U.S. of 3rd order outlets")+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,1)+
+        theme(aspect.ratio = 1)
+#13
+thirteen <- NO3_1stO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("% of 1st-order\n Streams Restored")+
+  ylab("%NO3 Removed \n U.S. of 4th order outlet")+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,1)+
+        theme(aspect.ratio = 1)
+
+#2
+two <- NO3_2ndO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "Total Length of 2nd-order Rivers Restored [km]", breaks = seq(0,35,5)))+
+  ylim(0,1)+
+        theme(aspect.ratio = 1)
+#6
+six <- NO3_2ndO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,1)+
+        theme(aspect.ratio = 1)
+#10
+ten <- NO3_2ndO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,1)+
+        theme(aspect.ratio = 1)
+#14
+fourteen <- NO3_2ndO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("% of 2nd-order\n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,1)+
+        theme(aspect.ratio = 1)
+
+#3
+three <- NO3_3rdO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,1)+
+        theme(aspect.ratio = 1)
+#7
+seven <- NO3_3rdO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,1)+
+        theme(aspect.ratio = 1)
+#11
+eleven <- NO3_3rdO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+ ylim(0,1)+
+        theme(aspect.ratio = 1)
+#15
+fifteen <- NO3_3rdO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("% of 3rd-order\n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,1)+
+        theme(aspect.ratio = 1)
+
+#4
+four <- NO3_4thO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,1)+
+        theme(aspect.ratio = 1)
+#8
+eight <- NO3_4thO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  ylim(0,1)+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+        theme(aspect.ratio = 1)
+#12
+twelve <- NO3_4thO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,1)+
+        theme(aspect.ratio = 1)
+#16
+sixteen <- NO3_4thO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("% of 4th-order \n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,1)+
+        theme(aspect.ratio = 1)
+
+
+one+theme(text = element_text(size = 5))+scale_x_continuous(sec.axis = sec_axis(~. * 0.43891, name = "Total Length of 1st-order Rivers Restored [km]", breaks = seq(0,50,10)))+
+two+theme(text = element_text(size = 5))+scale_x_continuous(sec.axis = sec_axis(~. * 0.30175, name = "Total Length of 2nd-order Rivers Restored [km]", breaks = seq(0,35,5)))+
+three+theme(text = element_text(size = 5))+scale_x_continuous(sec.axis = sec_axis(~. * 0.25603, name = "Total Length of 3rd-order Rivers Restored [km]", breaks = seq(0,30,5)))+
+four+theme(text = element_text(size = 5))+ scale_x_continuous(sec.axis = sec_axis(~. * 0.30785, name = "Total Length of 4th-order River Restored [km]", breaks = seq(0,35,5)))+
+five+theme(text = element_text(size = 5))+
+six+theme(text = element_text(size = 5))+
+seven+theme(text = element_text(size = 5))+
+eight+theme(text = element_text(size = 5))+
+nine+theme(text = element_text(size = 5))+
+ten+theme(text = element_text(size = 5))+
+eleven +theme(text = element_text(size = 5))+ 
+twelve +theme(text = element_text(size = 5))+ 
+thirteen+theme(text = element_text(size = 5))+
+fourteen+theme(text = element_text(size = 5))+
+fifteen+theme(text = element_text(size = 5))+
+sixteen+theme(text = element_text(size = 5))+
+            plot_layout(ncol = 4, guides = "collect")+
+            plot_annotation(title = 'Percent NO3 Removed from the Watershed Cumulatively (km)', 
+                            theme = theme(title = element_text(size = 8, face = 2)))
+```
+
+```{r}
+ggsave("Exports/SOmatrixWSL_km_uni.png", dpi=500, height=4, width=5, units="in")
+#ggsave("Exports/SOmatrixWSL_km_non.png", dpi=500, height=4, width=5, units="in")
+```
+
+#k10 cumulative
+```{r}
+#1
+one <- NO3_1stO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k10_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k10_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%NO3 Removed \n U.S. of 1st order outlets")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "Total Length of 1st-order Rivers Restored [km]", breaks = seq(0,50,10)))+
+  ylim(0,0.1)+
+        theme(aspect.ratio = 1)
+#5
+five <- NO3_1stO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k10_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k10_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%NO3 Removed \n U.S. of 2nd order outlets")+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,0.1)+
+        theme(aspect.ratio = 1)
+#9
+nine <- NO3_1stO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k10_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k10_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%NO3 Removed\n U.S. of 3rd order outlets")+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,0.1)+
+        theme(aspect.ratio = 1)
+#13
+thirteen <- NO3_1stO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k10_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k10_PerCumRem, color = storm), size = 0.2)+
+  xlab("% of 1st-order\n Streams Restored")+
+  ylab("%NO3 Removed \n U.S. of 4th order outlet")+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,0.1)+
+        theme(aspect.ratio = 1)
+
+#2
+two <- NO3_2ndO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k10_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k10_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "Total Length of 2nd-order Rivers Restored [km]", breaks = seq(0,35,5)))+
+ ylim(0,0.1)+
+        theme(aspect.ratio = 1)
+#6
+six <- NO3_2ndO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k10_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k10_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,0.1)+
+        theme(aspect.ratio = 1)
+#10
+ten <- NO3_2ndO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k10_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k10_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,0.1)+
+        theme(aspect.ratio = 1)
+#14
+fourteen <- NO3_2ndO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k10_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k10_PerCumRem, color = storm), size = 0.2)+
+  xlab("% of 2nd-order\n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+ ylim(0,0.1)+
+        theme(aspect.ratio = 1)
+
+#3
+three <- NO3_3rdO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k10_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k10_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "Total Length of 3rd-order Rivers Restored [km]", breaks = seq(0,30,5)))+
+ ylim(0,0.1)+
+        theme(aspect.ratio = 1)
+#7
+seven <- NO3_3rdO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k10_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k10_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,0.1)+
+        theme(aspect.ratio = 1)
+#11
+eleven <- NO3_3rdO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k10_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k10_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+ylim(0,0.1)+
+        theme(aspect.ratio = 1)
+#15
+fifteen <- NO3_3rdO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k10_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k10_PerCumRem, color = storm), size = 0.2)+
+  xlab("% of 3rd-order\n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+ ylim(0,0.1)+
+        theme(aspect.ratio = 1)
+
+#4
+four <- NO3_4thO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k10_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k10_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "Total Length of 4th-order River Restored [km]", breaks = seq(0,35,5)))+
+  ylim(0,0.1)+
+        theme(aspect.ratio = 1)
+#8
+eight <- NO3_4thO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k10_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k10_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+ ylim(0,0.1)+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+        theme(aspect.ratio = 1)
+#12
+twelve <- NO3_4thO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k10_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k10_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,0.1)+
+        theme(aspect.ratio = 1)
+#16
+sixteen <- NO3_4thO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k10_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k10_PerCumRem, color = storm), size = 0.2)+
+  xlab("% of 4th-order \n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,0.1)+
+        theme(aspect.ratio = 1)
+
+
+one+theme(text = element_text(size = 5))+
+two+theme(text = element_text(size = 5))+
+three+theme(text = element_text(size = 5))+
+four+theme(text = element_text(size = 5))+
+five+theme(text = element_text(size = 5))+
+six+theme(text = element_text(size = 5))+
+seven+theme(text = element_text(size = 5))+
+eight+theme(text = element_text(size = 5))+
+nine+theme(text = element_text(size = 5))+
+ten+theme(text = element_text(size = 5))+
+eleven +theme(text = element_text(size = 5))+ 
+twelve +theme(text = element_text(size = 5))+ 
+thirteen+theme(text = element_text(size = 5))+
+fourteen+theme(text = element_text(size = 5))+
+fifteen+theme(text = element_text(size = 5))+
+sixteen+theme(text = element_text(size = 5))+
+            plot_layout(ncol = 4, guides = "collect")+
+            plot_annotation(title = 'Percent NO3 Removed from the Watershed Cumulatively (k10)', 
+                            theme = theme(title = element_text(size = 8, face = 2)))
+ggsave("Exports/SOmatrixWSL_uni_k10.png", dpi=500, height=4, width=5, units="in")
+#ggsave("Exports/SOmatrixWSL_non_k10.png", dpi=500, height=4, width=5, units="in")
+```
+
+
+#k90 cumulative
+```{r}
+#1
+one <- NO3_1stO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%NO3 Removed \n U.S. of 1st order outlets")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "Total Length of 1st-order Rivers Restored [km]", breaks = seq(0,50,10)))+
+  ylim(0,20)+
+        theme(aspect.ratio = 1)
+#5
+five <- NO3_1stO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%NO3 Removed \n U.S. of 2nd order outlets")+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,20)+
+        theme(aspect.ratio = 1)
+#9
+nine <- NO3_1stO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%NO3 Removed\n U.S. of 3rd order outlets")+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,20)+
+        theme(aspect.ratio = 1)
+#13
+thirteen <- NO3_1stO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_PerCumRem, color = storm), size = 0.2)+
+  xlab("% of 1st-order\n Streams Restored")+
+  ylab("%NO3 Removed \n U.S. of 4th order outlet")+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,20)+
+        theme(aspect.ratio = 1)
+
+#2
+two <- NO3_2ndO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "Total Length of 2nd-order Rivers Restored [km]", breaks = seq(0,35,5)))+
+  ylim(0,20)+
+        theme(aspect.ratio = 1)
+#6
+six <- NO3_2ndO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,20)+
+        theme(aspect.ratio = 1)
+#10
+ten <- NO3_2ndO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,20)+
+        theme(aspect.ratio = 1)
+#14
+fourteen <- NO3_2ndO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_PerCumRem, color = storm), size = 0.2)+
+  xlab("% of 2nd-order\n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,20)+
+        theme(aspect.ratio = 1)
+
+#3
+three <- NO3_3rdO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "Total Length of 3rd-order Rivers Restored [km]", breaks = seq(0,30,5)))+
+  ylim(0,20)+
+        theme(aspect.ratio = 1)
+#7
+seven <- NO3_3rdO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,20)+
+        theme(aspect.ratio = 1)
+#11
+eleven <- NO3_3rdO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,20)+
+        theme(aspect.ratio = 1)
+#15
+fifteen <- NO3_3rdO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_PerCumRem, color = storm), size = 0.2)+
+  xlab("% of 3rd-order\n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,20)+
+        theme(aspect.ratio = 1)
+
+#4
+four <- NO3_4thO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "Total Length of 4th-order River Restored [km]", breaks = seq(0,35,5)))+
+  ylim(0,20)+
+        theme(aspect.ratio = 1)
+#8
+eight <- NO3_4thO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  ylim(0,20)+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+        theme(aspect.ratio = 1)
+#12
+twelve <- NO3_4thO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_PerCumRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,20)+
+        theme(aspect.ratio = 1)
+#16
+sixteen <- NO3_4thO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_PerCumRem, color = storm), size = 0.2)+
+  xlab("% of 4th-order \n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,20)+
+        theme(aspect.ratio = 1)
+
+
+one+theme(text = element_text(size = 5))+
+two+theme(text = element_text(size = 5))+
+three+theme(text = element_text(size = 5))+
+four+theme(text = element_text(size = 5))+
+five+theme(text = element_text(size = 5))+
+six+theme(text = element_text(size = 5))+
+seven+theme(text = element_text(size = 5))+
+eight+theme(text = element_text(size = 5))+
+nine+theme(text = element_text(size = 5))+
+ten+theme(text = element_text(size = 5))+
+eleven +theme(text = element_text(size = 5))+ 
+twelve +theme(text = element_text(size = 5))+ 
+thirteen+theme(text = element_text(size = 5))+
+fourteen+theme(text = element_text(size = 5))+
+fifteen+theme(text = element_text(size = 5))+
+sixteen+theme(text = element_text(size = 5))+
+            plot_layout(ncol = 4, guides = "collect")+
+            plot_annotation(title = 'Percent NO3 Removed from the Watershed Cumulatively (k90)', 
+                            theme = theme(title = element_text(size = 8, face = 2)))
+ggsave("Exports/SOmatrixWSL_uni_k90.png", dpi=500, height=4, width=5, units="in")
+#ggsave("Exports/SOmatrixWSL_non_k90.png", dpi=500, height=4, width=5, units="in")
+```
+#k90 cumulative 2mgL
+```{r}
+#1
+one <- NO3_1stO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%NO3 Removed \n U.S. of 1st order outlets")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "Total Length of 1st-order Rivers Restored [km]", breaks = seq(0,50,10)))+
+  ylim(0,40)+
+        theme(aspect.ratio = 1)
+#5
+five <- NO3_1stO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%NO3 Removed \n U.S. of 2nd order outlets")+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,40)+
+        theme(aspect.ratio = 1)
+#9
+nine <- NO3_1stO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%NO3 Removed\n U.S. of 3rd order outlets")+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,40)+
+        theme(aspect.ratio = 1)
+#13
+thirteen <- NO3_1stO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), size = 0.2)+
+  xlab("% of 1st-order\n Streams Restored")+
+  ylab("%NO3 Removed \n U.S. of 4th order outlet")+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,40)+
+        theme(aspect.ratio = 1)
+
+#2
+two <- NO3_2ndO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "Total Length of 2nd-order Rivers Restored [km]", breaks = seq(0,35,5)))+
+  ylim(0,40)+
+        theme(aspect.ratio = 1)
+#6
+six <- NO3_2ndO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,40)+
+        theme(aspect.ratio = 1)
+#10
+ten <- NO3_2ndO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,40)+
+        theme(aspect.ratio = 1)
+#14
+fourteen <- NO3_2ndO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), size = 0.2)+
+  xlab("% of 2nd-order\n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,40)+
+        theme(aspect.ratio = 1)
+
+#3
+three <- NO3_3rdO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "Total Length of 3rd-order Rivers Restored [km]", breaks = seq(0,30,5)))+
+  ylim(0,40)+
+        theme(aspect.ratio = 1)
+#7
+seven <- NO3_3rdO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,40)+
+        theme(aspect.ratio = 1)
+#11
+eleven <- NO3_3rdO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,40)+
+        theme(aspect.ratio = 1)
+#15
+fifteen <- NO3_3rdO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), size = 0.2)+
+  xlab("% of 3rd-order\n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,40)+
+        theme(aspect.ratio = 1)
+
+#4
+four <- NO3_4thO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,40)+
+        theme(aspect.ratio = 1)
+#8
+eight <- NO3_4thO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  ylim(0,40)+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+        theme(aspect.ratio = 1)
+#12
+twelve <- NO3_4thO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,40)+
+        theme(aspect.ratio = 1)
+#16
+sixteen <- NO3_4thO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pWLR_.5mgL, color = storm), size = 0.2)+
+  xlab("% of 4th-order \n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,40)+
+        theme(aspect.ratio = 1)
+
+
+one+theme(text = element_text(size = 5))+
+two+theme(text = element_text(size = 5))+
+three+theme(text = element_text(size = 5))+
+four+theme(text = element_text(size = 5))+
+five+theme(text = element_text(size = 5))+
+six+theme(text = element_text(size = 5))+
+seven+theme(text = element_text(size = 5))+
+eight+theme(text = element_text(size = 5))+
+nine+theme(text = element_text(size = 5))+
+ten+theme(text = element_text(size = 5))+
+eleven +theme(text = element_text(size = 5))+ 
+twelve +theme(text = element_text(size = 5))+ 
+thirteen+theme(text = element_text(size = 5))+
+fourteen+theme(text = element_text(size = 5))+
+fifteen+theme(text = element_text(size = 5))+
+sixteen+theme(text = element_text(size = 5))+
+            plot_layout(ncol = 4, guides = "collect")+
+            plot_annotation(title = 'Percent NO3 Removed from the Watershed Cumulatively (k90) \n 0.5 mgL source concentration', 
+                            theme = theme(title = element_text(size = 8, face = 2)))
+ggsave("Exports/SOmatrixWSL_uni_k90.5mgL.png", dpi=500, height=4, width=5, units="in")
+# ggsave("Exports/SOmatrixWSL_non_k90.5mgL.png", dpi=500, height=4, width=5, units="in")
+```
+
+#Local removal Plots
+```{r}
+#1
+one <- NO3_1stO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentOLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentOLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("% 1st order NO3 Removed \n by the 1st order Rivers")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "Total Length of 1st-order Rivers Restored [km]", breaks = seq(0,50,10)))+
+  ylim(0,4)+
+        theme(aspect.ratio = 1)
+#5
+five <-  NO3_1stO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentOLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentOLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("% 2nd order NO3 Removed \n by the 2nd order Rivers")+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,4)+
+        theme(aspect.ratio = 1)
+#9
+nine <-  NO3_1stO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentOLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentOLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("% 3rd order NO3 Removed \n by 3rd order Rivers")+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,4)+
+        theme(aspect.ratio = 1)
+#13
+thirteen <-  NO3_1stO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentOLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentOLR, color = storm), size = 0.2)+
+  xlab("% of 1st-order\n Streams Restored")+
+  ylab("% 4th order NO3 Removed \n by the 4th order River")+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,4)+
+        theme(aspect.ratio = 1)
+
+
+#2
+two <- NO3_2ndO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentOLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentOLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "Total Length of 2nd-order Rivers Restored [km]", breaks = seq(0,35,5)))+
+  ylim(0,4)+
+        theme(aspect.ratio = 1)
+#6
+six <- NO3_2ndO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentOLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentOLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+ ylim(0,4)+
+        theme(aspect.ratio = 1)
+#10
+ten <- NO3_2ndO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentOLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentOLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,4)+
+        theme(aspect.ratio = 1)
+#14
+fourteen <- NO3_2ndO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentOLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentOLR, color = storm), size = 0.2)+
+  xlab("% of 2nd-order\n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,4)+
+        theme(aspect.ratio = 1)
+
+#3
+three <- NO3_3rdO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentOLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentOLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "Total Length of 3rd-order Rivers Restored [km]", breaks = seq(0,30,5)))+
+  ylim(0,4)+
+        theme(aspect.ratio = 1)
+#7
+seven <- NO3_3rdO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentOLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentOLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,4)+
+        theme(aspect.ratio = 1)
+#11
+eleven <- NO3_3rdO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentOLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentOLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,4)+
+        theme(aspect.ratio = 1)
+#15
+fifteen <- NO3_3rdO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentOLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentOLR, color = storm), size = 0.2)+
+  xlab("% of 3rd-order\n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,4)+
+        theme(aspect.ratio = 1)
+
+#4
+four <- NO3_4thO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentOLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentOLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "Total Length of 4th-order River Restored [km]", breaks = seq(0,35,5)))+
+  ylim(0,4)+
+        theme(aspect.ratio = 1)
+#8
+eight <- NO3_4thO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentOLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentOLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,4)+
+        theme(aspect.ratio = 1)
+#12
+twelve <- NO3_4thO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentOLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentOLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,4)+
+        theme(aspect.ratio = 1)
+#16
+sixteen <- NO3_4thO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentOLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentOLR, color = storm), size = 0.2)+
+  xlab("% of 4th-order \n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylim(0,4)+
+        theme(aspect.ratio = 1)
+
+one+theme(text = element_text(size = 5))+
+two+theme(text = element_text(size = 5))+
+three+theme(text = element_text(size = 5))+
+four+theme(text = element_text(size = 5))+
+five+theme(text = element_text(size = 5))+
+six+theme(text = element_text(size = 5))+
+seven+theme(text = element_text(size = 5))+
+eight+theme(text = element_text(size = 5))+
+nine+theme(text = element_text(size = 5))+
+ten+theme(text = element_text(size = 5))+
+eleven +theme(text = element_text(size = 5))+ 
+twelve +theme(text = element_text(size = 5))+ 
+thirteen+theme(text = element_text(size = 5))+
+fourteen+theme(text = element_text(size = 5))+
+fifteen+theme(text = element_text(size = 5))+
+sixteen+theme(text = element_text(size = 5))+
+          plot_layout(ncol = 4, guides = "collect")+
+          plot_annotation(title = 'Percent NO3 Removed from an Individual Order \n With Respect to the Loading to the Individual Order (km)', 
+                          theme = theme(title = element_text(size = 8, face = 2)))
+```
+
+```{r}
+ggsave("Exports/localRem_matrix_km_uni.png", dpi=500, height=4, width=5, units="in")
+#ggsave("Exports/localRem_matrix_km_non.png", dpi=500, height=4, width=5, units="in")
+```
+
+##Engineering added benefit plots:
+```{r}
+NO3_SO <- bind_rows(NO3_1stO, NO3_2ndO, NO3_3rdO, NO3_4thO)%>%
+  mutate_if(is.numeric, # Using dplyr functions
+            round,
+            digits = 3)
+NO3_SO$storm <- factor(NO3_SO$storm,                 # Re-level group factor
+                         levels = c("Q2", "Q1", "Q0.5", "Qm"))
+NO3_SO%>%
+  filter(plan == "unr" | plan == "1st-20p" | plan == "1st-40p" | plan == "1st-60p" | plan == "1st-80p" | plan == "1st-100p")%>%
+  ggplot()+
+  geom_line(aes(percentRest, km_percentWLR, color = storm))+
+  geom_point(aes(percentRest, km_percentWLR, color = storm))+
+  facet_wrap( ~river, scales = "free", ncol = 2)+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  xlab("% of 1st-order Streams Restored")+
+  ylab("%Total Watershed NO3 Removed \n in a Particular River")+
+  ggtitle("NO3 Removal Added Benefit from Each Order (km)")
+#ggsave("Exports/Isolated_AddedBenefit_km1stO.png", dpi=500, height=4, width=5, units="in")
+
+NO3_SO%>%
+  filter(plan == "unr" | plan == "2nd-20p" | plan == "2nd-60p" | plan == "2nd-80p" | plan == "2nd-100p")%>%
+  ggplot()+
+  geom_line(aes(percentRest, km_percentWLR, color = storm))+
+  geom_point(aes(percentRest, km_percentWLR, color = storm))+
+  facet_wrap( ~river, scales = "free", ncol = 2)+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  xlab("% of 2nd-order Streams Restored")+
+  ylab("%Total Watershed NO3 Removed \n in a Particular River")+
+  ggtitle("NO3 Removal Added Benefit from Each Order (km)")
+#ggsave("Exports/Isolated_AddedBenefit_km2ndO.png", dpi=500, height=4, width=5, units="in")
+
+NO3_SO%>%
+  filter(plan == "unr" | plan == "3rd-20p" | plan == "3rd-40p" | plan == "3rd-60p" | plan == "3rd-80p" | plan == "3rd-100p")%>%
+  ggplot()+
+  geom_line(aes(percentRest, km_percentWLR, color = storm))+
+  geom_point(aes(percentRest, km_percentWLR, color = storm))+
+  facet_wrap( ~river, scales = "free", ncol = 2)+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  xlab("% of 3rd-order Streams Restored")+
+  ylab("%Total Watershed NO3 Removed \n in a Particular River")+
+  ggtitle("NO3 Removal Added Benefit from Each Order (km)")
+#ggsave("Exports/Isolated_AddedBenefit_km3rdO.png", dpi=500, height=4, width=5, units="in")
+
+NO3_SO%>%
+  filter(plan == "unr" | plan == "4th-20p" | plan == "4th-40p" | plan == "4th-60p" | plan == "4th-80p" | plan == "4th-100p")%>%
+  ggplot()+
+  geom_line(aes(percentRest, km_percentWLR, color = storm))+
+  geom_point(aes(percentRest, km_percentWLR, color = storm))+
+  facet_wrap( ~river, scales = "free", ncol = 2)+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  xlab("% of 4th-order Stream Restored")+
+  ylab("%Total Watershed NO3 Removed \n in a Particular River")+
+  ggtitle("NO3 Removal Added Benefit from Each Order (km)")
+#ggsave("Exports/Isolated_AddedBenefit_km4thO.png", dpi=500, height=4, width=5, units="in")
+
+# write_csv(NO3_SO, "Exports/NO3_SO_data.csv")
+```
+
+
+#Added Benefit Matrix
+```{r}
+#1
+one <- NO3_1stO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentWLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentWLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%Tot Watershed Load Rem. \n by the 1st order Rivers")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "Tot Length of 1st-order\n Rivers Restored [km]", breaks = seq(0,50,10)))+
+  # ylim(0,1)+
+        theme(aspect.ratio = 1)
+#5
+five <-  NO3_1stO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentWLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentWLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%Tot Watershed Load Rem. \n by the 2nd order Rivers")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "", breaks = seq(0,50,10)))+
+  # ylim(0,1)+
+        theme(aspect.ratio = 1)
+#9
+nine <-  NO3_1stO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentWLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentWLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%Tot Watershed Load Rem.  \n by 3rd order Rivers")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "", breaks = seq(0,50,10)))+
+  # ylim(0,1)+
+        theme(aspect.ratio = 1)
+#13
+thirteen <-  NO3_1stO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentWLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentWLR, color = storm), size = 0.2)+
+  xlab("% of 1st-order\n Streams Restored")+
+  ylab("%Tot Watershed Load Rem.  \n by the 4th order River")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "", breaks = seq(0,50,10)))+
+  # ylim(0,1)+
+        theme(aspect.ratio = 1)
+
+
+#2
+two <- NO3_2ndO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentWLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentWLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "Tot Length of 2nd-order\n Rivers Restored [km]", breaks = seq(0,35,5)))+
+  # ylim(0,1)+
+        theme(aspect.ratio = 1)
+#6
+six <- NO3_2ndO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentWLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentWLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "", breaks = seq(0,35,5)))+
+  # ylim(0,1)+
+        theme(aspect.ratio = 1)
+#10
+ten <- NO3_2ndO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentWLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentWLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "", breaks = seq(0,35,5)))+
+  # ylim(0,1)+
+        theme(aspect.ratio = 1)
+#14
+fourteen <- NO3_2ndO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentWLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentWLR, color = storm), size = 0.2)+
+  xlab("% of 2nd-order\n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "", breaks = seq(0,35,5)))+
+  # ylim(0,1)+
+        theme(aspect.ratio = 1)
+
+#3
+three <- NO3_3rdO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentWLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentWLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "Tot Length of 3rd-order\n Rivers Restored [km]", breaks = seq(0,30,5)))+
+  # ylim(0,1)+
+        theme(aspect.ratio = 1)
+#7
+seven <- NO3_3rdO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentWLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentWLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "", breaks = seq(0,30,5)))+
+  # ylim(0,1)+
+        theme(aspect.ratio = 1)
+#11
+eleven <- NO3_3rdO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentWLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentWLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "", breaks = seq(0,30,5)))+
+  # ylim(0,1)+
+        theme(aspect.ratio = 1)
+#15
+fifteen <- NO3_3rdO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentWLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentWLR, color = storm), size = 0.2)+
+  xlab("% of 3rd-order\n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "", breaks = seq(0,30,5)))+
+  # ylim(0,1)+
+        theme(aspect.ratio = 1)
+
+#4
+four <- NO3_4thO %>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentWLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentWLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "Tot Length of 4th-order\n River Restored [km]", breaks = seq(0,35,5)))+
+  # ylim(0,1)+
+        theme(aspect.ratio = 1)
+#8
+eight <- NO3_4thO %>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentWLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentWLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "", breaks = seq(0,35,5)))+
+  # ylim(0,1)+
+        theme(aspect.ratio = 1)
+#12
+twelve <- NO3_4thO %>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentWLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentWLR, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "", breaks = seq(0,35,5)))+
+  # ylim(0,1)+
+        theme(aspect.ratio = 1)
+#16
+sixteen <- NO3_4thO %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_percentWLR, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_percentWLR, color = storm), size = 0.2)+
+  xlab("% of 4th-order \n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "", breaks = seq(0,35,5)))+
+  # ylim(0,1)+
+        theme(aspect.ratio = 1)
+
+one+theme(text = element_text(size = 5))+
+two+theme(text = element_text(size = 5))+
+three+theme(text = element_text(size = 5))+
+four+theme(text = element_text(size = 5))+
+five+theme(text = element_text(size = 5))+
+six+theme(text = element_text(size = 5))+
+seven+theme(text = element_text(size = 5))+
+eight+theme(text = element_text(size = 5))+
+nine+theme(text = element_text(size = 5))+
+ten+theme(text = element_text(size = 5))+
+eleven +theme(text = element_text(size = 5))+ 
+twelve +theme(text = element_text(size = 5))+ 
+thirteen+theme(text = element_text(size = 5))+
+fourteen+theme(text = element_text(size = 5))+
+fifteen+theme(text = element_text(size = 5))+
+sixteen+theme(text = element_text(size = 5))+
+          plot_layout(ncol = 4, guides = "collect")+
+          plot_annotation(title = '%Total Watershed Load Removed by an Individual Order (km)', 
+                          theme = theme(title = element_text(size = 8, face = 2))) &
+  ylim(0,1)
+```
+
+
+
+```{r}
+# ggsave("Exports/EngAddedBenefit_non_km.png", dpi=500, height=4, width=5, units="in")
+ggsave("Exports/EngAddedBenefit_uni_km.png", dpi=500, height=5, width=5, units="in")
+```
+
+##unrestored removal baseline plot
+
+```{r}
+unr <- rbind(NO3_1stO, NO3_2ndO, NO3_3rdO, NO3_4thO)
+unr <- unr%>%
+  filter(plan == "unr")%>%
+  mutate(Order = case_when(river == "1-7"~"1st-order",
+                           river == "2-2"~"2nd-order",
+                           river == "3-1"~"3rd-order",
+                           river == "4-1"~"4th-order"))
+unr$storm <- factor(unr$storm,                 # Re-level group factor
+                         levels = c("Qm", "Q0.5", "Q1", "Q2"))
+unr%>%
+  ggplot()+
+  geom_point(aes(storm, km_percentWLR, color = Order))+
+  geom_line(aes(storm, km_percentWLR, group = Order, color = Order))+
+  ylim(0,0.2)+
+  xlab("Storm Occurance")+
+  ylab("Percent of Total Watershed Load Removed")+
+  ggtitle("Unrestored Watershed- Percent Nitrate Removed \n (km baseline removal)")
+
+ggsave("Exports/baselineRemoval_km.png", dpi=500, height=4, width=5, units="in")
+```
+
+
+
+##Average cross-sectional time of inundation plots:
+```{r}
+#I just changed avg to sum to get total inundation time and changed labels so I didnt have to write new code.
+filter_inun1stO <- inun_1stO %>%
+  group_by(storm, plan, river)%>%
+  summarize(ti_min = sum(ti_tot_min)/60)%>% 
+  mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
+                                 endsWith(plan, "80p")~ 80,
+                                 endsWith(plan, "60p")~ 60,
+                                 endsWith(plan, "40p")~ 40,
+                                 endsWith(plan, "20p")~ 20,
+                                 endsWith(plan, "unr")~ 0))%>%
+  mutate(River_Order = 
+           case_when(            river == "1-7" ~ "1st", 
+                                 river == "2-2" ~ "2nd",
+                                 river == "3-1" ~ "3rd",
+                                 river == "4-1" ~ "4th")) 
+filter_inun1stO$storm <- factor(filter_inun1stO$storm,                 # Re-level group factor
+                         levels = c("Q2", "Q1", "Q0.5", "Qm"))
+filter_inun1stO %>%
+  ggplot()+
+  geom_line(aes(x = percentRest, y = ti_min, color = River_Order))+
+  geom_point(aes(x = percentRest, y = ti_min, color = River_Order))+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  facet_wrap( ~ storm, scales = "free", ncol = 2)+
+  ylab("Total Floodplain Inundation Time (hr)")+
+  xlab("Percent 1st-order streams restored")+
+  scale_y_log10()+
+  ggtitle("Total Inundation Time \n Incremental 1st Order Restoration")
+
+ggsave("Exports/totInun_times1st_log.png", dpi=500,  units="in")
+
+filter_inun2ndO <- inun_2ndO %>%
+  group_by(storm, plan, river)%>%
+  summarize(ti_min = sum(ti_tot_min)/60) %>% 
+  mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
+                                 endsWith(plan, "80p")~ 80,
+                                 endsWith(plan, "60p")~ 60,
+                                 endsWith(plan, "40p")~ 40,
+                                 endsWith(plan, "20p")~ 20,
+                                 endsWith(plan, "unr")~ 0))%>%
+  mutate(River_Order = 
+           case_when(            river == "1-7" ~ "1st", 
+                                 river == "2-2" ~ "2nd",
+                                 river == "3-1" ~ "3rd",
+                                 river == "4-1" ~ "4th")) 
+filter_inun2ndO$storm <- factor(filter_inun2ndO$storm,                 # Re-level group factor
+                         levels = c("Q2", "Q1", "Q0.5", "Qm"))
+
+filter_inun2ndO %>%
+  ggplot()+
+  geom_line(aes(x = percentRest, y = ti_min, color = River_Order))+
+  geom_point(aes(x = percentRest, y = ti_min, color = River_Order))+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  facet_wrap( ~ storm, scales = "free", ncol = 2)+
+  ylab("Total Floodplain Inundation Time (hr)")+
+  xlab("Percent 2nd-order streams restored")+
+    scale_y_log10()+
+  ggtitle("Total Inundation Time \n Incremental 2nd Order Restoration")
+
+ggsave("Exports/TotInun_times2nd_log.png", dpi=500,  units="in")
+
+filter_inun3rdO <- inun_3rdO %>%
+  group_by(storm, plan, river)%>%
+  summarize(ti_min = sum(ti_tot_min)/60) %>% 
+  mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
+                                 endsWith(plan, "80p")~ 80,
+                                 endsWith(plan, "60p")~ 60,
+                                 endsWith(plan, "40p")~ 40,
+                                 endsWith(plan, "20p")~ 20,
+                                 endsWith(plan, "unr")~ 0))%>%
+  mutate(River_Order = 
+           case_when(            river == "1-7" ~ "1st", 
+                                 river == "2-2" ~ "2nd",
+                                 river == "3-1" ~ "3rd",
+                                 river == "4-1" ~ "4th")) 
+filter_inun3rdO$storm <- factor(filter_inun3rdO$storm,                 # Re-level group factor
+                         levels = c("Q2", "Q1", "Q0.5", "Qm"))
+
+filter_inun3rdO %>%
+  ggplot()+
+  geom_line(aes(x = percentRest, y = ti_min, color = River_Order))+
+  geom_point(aes(x = percentRest, y = ti_min, color = River_Order))+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  facet_wrap( ~ storm, scales = "free", ncol = 2)+
+  ylab("Total Floodplain Inundation Time (hr)")+
+  xlab("Percent 3rd-order streams restored")+
+    scale_y_log10()+
+  ggtitle("Total Inundation Time \n Incremental 3rd Order Restoration")
+
+ggsave("Exports/totInun_times3rd_log.png", dpi=500,  units="in")
+
+
+filter_inun4thO <- inun_4thO %>%
+  group_by(storm, plan, river)%>%
+  summarize(ti_min = sum(ti_tot_min)/60) %>% 
+  mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
+                                 endsWith(plan, "80p")~ 80,
+                                 endsWith(plan, "60p")~ 60,
+                                 endsWith(plan, "40p")~ 40,
+                                 endsWith(plan, "20p")~ 20,
+                                 endsWith(plan, "unr")~ 0))%>%
+  mutate(River_Order = 
+           case_when(            river == "1-7" ~ "1st", 
+                                 river == "2-2" ~ "2nd",
+                                 river == "3-1" ~ "3rd",
+                                 river == "4-1" ~ "4th")) 
+filter_inun4thO$storm <- factor(filter_inun4thO$storm,                 # Re-level group factor
+                         levels = c("Q2", "Q1", "Q0.5", "Qm"))
+
+filter_inun4thO %>%
+  ggplot()+
+  geom_line(aes(x = percentRest, y = ti_min, color = River_Order))+
+  geom_point(aes(x = percentRest, y = ti_min, color = River_Order))+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  facet_wrap( ~ storm, scales = "free", nrow = 2)+
+  ylab("Total Floodplain Inundation Time (hr)")+
+  xlab("Percent 4th-order streams restored")+
+    scale_y_log10()+
+  ggtitle("Total Inundation Time \n Incremental 4th Order Restoration")
+
+ggsave("Exports/totInun_times4th_log.png", dpi=500,  units="in")
+```
+
+
+
+#Outlet Plots:
+```{r}
+#make sure to run individual order removal matrix
+outlet_1stO <- NO3_1stO %>%
+  group_by(storm,plan)%>%
+  summarise(km_Premoval = sum(km_percentWLR), k90_Premoval = sum(k90_percentWLR), k10_Premoval = sum(k10_percentWLR), 
+            km_pWLR_2mgL =    sum(km_pWLR_2mgL), k90_pWLR_2mgL = sum(k90_pWLR_2mgL), k10_pWLR_2mgL = sum(k10_pWLR_2mgL), 
+            km_pWLR_.5mgL = sum(km_pWLR_.5mgL), k90_pWLR_.5mgL = sum(k90_pWLR_.5mgL), k10_pWLR_.5mgL = sum(k10_pWLR_.5mgL))%>%
+  mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
+                                 endsWith(plan, "80p")~ 80,
+                                 endsWith(plan, "60p")~ 60,
+                                 endsWith(plan, "40p")~ 40,
+                                 endsWith(plan, "20p")~ 20,
+                                 endsWith(plan, "unr")~ 0)) %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_Premoval, color = storm),linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_Premoval, color = storm), size = 0.2)+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "Tot Length of 1st-order Rivers Restored [km]", breaks = seq(0,50,10)))+
+  xlab(element_blank())+
+  ylim(0,0.2)+
+  ylab("% NO3 Removed from Watershed")+
+        theme(aspect.ratio = 1)
+  
+outlet_2ndO <- NO3_2ndO %>% 
+    group_by(storm,plan)%>%
+    summarise(km_Premoval = sum(km_percentWLR), k90_Premoval = sum(k90_percentWLR), k10_Premoval = sum(k10_percentWLR), 
+              km_pWLR_2mgL = sum(km_pWLR_2mgL), k90_pWLR_2mgL = sum(k90_pWLR_2mgL), k10_pWLR_2mgL = sum(k10_pWLR_2mgL), 
+              km_pWLR_.5mgL = sum(km_pWLR_.5mgL), k90_pWLR_.5mgL = sum(k90_pWLR_.5mgL), k10_pWLR_.5mgL = sum(k10_pWLR_.5mgL))%>%
+    mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
+                                 endsWith(plan, "80p")~ 80,
+                                 endsWith(plan, "60p")~ 60,
+                                 endsWith(plan, "40p")~ 40,
+                                 endsWith(plan, "20p")~ 20,
+                                 endsWith(plan, "unr")~ 0)) %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_Premoval, color = storm),linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_Premoval, color = storm), size = 0.2)+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "Tot Length of 2nd-order Rivers Restored [km]", breaks = seq(0,35,5)))+
+  xlab(element_blank())+
+    ylim(0,0.25)+
+  ylab("% NO3 Removed from Watershed")+
+        theme(aspect.ratio = 1)
+  
+outlet_3rdO <- NO3_3rdO %>%
+  group_by(storm,plan)%>%
+  summarise(km_Premoval = sum(km_percentWLR), k90_Premoval = sum(k90_percentWLR), k10_Premoval = sum(k10_percentWLR), 
+            km_pWLR_2mgL = sum(km_pWLR_2mgL), k90_pWLR_2mgL = sum(k90_pWLR_2mgL), k10_pWLR_2mgL = sum(k10_pWLR_2mgL), 
+            km_pWLR_.5mgL = sum(km_pWLR_.5mgL), k90_pWLR_.5mgL = sum(k90_pWLR_.5mgL), k10_pWLR_.5mgL = sum(k10_pWLR_.5mgL))%>%
+    mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
+                                 endsWith(plan, "80p")~ 80,
+                                 endsWith(plan, "60p")~ 60,
+                                 endsWith(plan, "40p")~ 40,
+                                 endsWith(plan, "20p")~ 20,
+                                 endsWith(plan, "unr")~ 0)) %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_Premoval, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_Premoval, color = storm), size = 0.2)+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "Tot Length of 3rd-order Rivers Restored [km]", breaks = seq(0,30,5)))+
+  xlab(element_blank())+
+  ylim(0,0.3)+
+  ylab("% NO3 Removed from Watershed")+
+        theme(aspect.ratio = 1)
+   
+outlet_4th <- NO3_4thO %>% 
+  group_by(storm,plan)%>%
+  summarise(km_Premoval = sum(km_percentWLR), k90_Premoval = sum(k90_percentWLR), k10_Premoval = sum(k10_percentWLR), 
+            km_pWLR_2mgL = sum(km_pWLR_2mgL), k90_pWLR_2mgL = sum(k90_pWLR_2mgL), k10_pWLR_2mgL = sum(k10_pWLR_2mgL), 
+            km_pWLR_.5mgL = sum(km_pWLR_.5mgL), k90_pWLR_.5mgL = sum(k90_pWLR_.5mgL), k10_pWLR_.5mgL = sum(k10_pWLR_.5mgL))%>%
+  mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
+                                 endsWith(plan, "80p")~ 80,
+                                 endsWith(plan, "60p")~ 60,
+                                 endsWith(plan, "40p")~ 40,
+                                 endsWith(plan, "20p")~ 20,
+                                 endsWith(plan, "unr")~ 0)) %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_Premoval, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_Premoval, color = storm), size = 0.2)+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "Tot Length of 4th-order River Restored [km]", breaks = seq(0,35,5)))+
+  ylim(0,1)+
+  xlab(element_blank())+
+  ylab("% NO3 Removed from Watershed")+
+        theme(aspect.ratio = 1)
+
+outlet_1stO+theme(text = element_text(size = 5))+ 
+  outlet_2ndO+theme(text = element_text(size = 5))+ 
+  outlet_3rdO+theme(text = element_text(size = 5))+ 
+  outlet_4th+theme(text = element_text(size = 5))+ 
+  one+ylim(0,0.2) +xlab("% of 1st-order Rivers Restored")+ylab("%NO3 Removed in 1st-order rivers")+
+          theme(text = element_text(size = 5))+ scale_x_continuous(sec.axis = sec_axis(~. * 0.43891, name = "", breaks = seq(0,50,10)))+
+  six +ylim(0,0.25)+xlab("% of 2nd-order Rivers Restored")+ylab("%NO3 Removed in 2nd-order rivers")+
+          theme(text = element_text(size = 5))+ scale_x_continuous(sec.axis = sec_axis(~. * 0.30175, name = "", breaks = seq(0,35,5)))+
+  eleven+ylim(0,0.3)+xlab("% of 3rd-order River Restored")+ylab("%NO3 Removed in 3rd-order rivers")+
+          theme(text = element_text(size = 5))+ scale_x_continuous(sec.axis = sec_axis(~. * 0.25603, name = "", breaks = seq(0,30,5)))+
+  sixteen+ylim(0,1)+xlab("% of 4th-order River Restored")+ylab("%NO3 Removed in 4th-order rivers")+
+          theme(text = element_text(size = 5))+scale_x_continuous(sec.axis = sec_axis(~. * 0.30785, name = "", breaks = seq(0,35,5)))+
+  plot_layout(ncol = 4, guides = "collect")+
+  plot_annotation(title = 'Percent of the Watershed NO3 Load Removed at the Outlet', 
+                          subtitle = "Median removal rate: 0.66 mg-N/m2hr",
+                          theme = theme(title = element_text(size = 8, face = 2)))
+  ggsave("Exports/outletRemoval_km.png", dpi=500, units="in")
+```
+
+
+
+#Plots representing the removal that would be observed if were monitoring DS of 1 watershed order
+```{r}
+# NO3_4thO <- NO3_4thO[!NO3_4thO$plan == "unr", ]
+
+#Nitrate loads for 1mg/L source concentration(g)
+Q2_watershed_load <- 4563108 #total NO3 load to the watershed (grams)
+Q2_load1 <- 141902 #input load to a all first order streams (grams)
+Q2_load2 <- 120581 #input load to a all second order streams (grams)
+Q2_load3 <- 680432 #input load to a all third order streams (grams)
+Q2_load4 <- 3620193 #input load to the fourth order stream (grams)
+
+Q1_watershed_load <- 3653361 #total NO3 load to the watershed (grams)
+Q1_load1 <- 102974 #input load to a all first order streams (grams)
+Q1_load2 <- 126125 #input load to a all second order streams (grams)
+Q1_load3 <- 545822 #input load to a all third order streams (grams)
+Q1_load4 <- 2878440 #input load to the fourth order stream (grams)
+
+Q0.5_watershed_load <- 2262609 #total NO3 load to the watershed (grams)
+Q0.5_load1 <- 91515 #input load to a all first order streams (grams)
+Q0.5_load2 <- 74539 #input load to a all second order streams (grams)
+Q0.5_load3 <- 325804 #input load to a all third order streams (grams)
+Q0.5_load4 <- 1770751 #input load to the fourth order stream (grams)
+
+Qm_watershed_load <- 245161 #total NO3 load to the watershed (grams)
+Qm_load1 <- 65880 #input load to a all first order streams (grams)
+Qm_load2 <- 3003 #input load to a all second order streams (grams)
+Qm_load3 <- 26865 #input load to a all third order streams (grams)
+Qm_load4 <- 149414 #input load to the fourth order stream (grams)
+
+monitorSO <- monitorSO %>% #bind_rows(NO3_1stO, NO3_2ndO, NO3_3rdO, NO3_4thO)%>% #NO3 removals here are from 1 river of each order
+  #1st order watershed monitor will be just filtering for river 1-7. Represents removal from one 1st order.
+  #2nd order watershed monitoring will be (1-7)*4 + (2-2)
+  #3rd order watershed monitoring will be ^ *3 + (3-1)
+  #4th order watershed monitoring will be ^ *2
+  #cumulatively summing removal at each order outlet. The load removed from a single order is the load associated with that order outlet column and river.
+  mutate(secOutlet = case_when(river == "1-7" ~ removal_k90_g*4,
+                               river == "2-2" ~ removal_k90_g),
+         secOutlet = ave(secOutlet, storm, plan, FUN = cumsum),
+         thirOutlet = case_when(river == "1-7" ~ removal_k90_g*12,
+                                river == "2-2" ~ removal_k90_g*3,
+                                river == "3-1" ~ removal_k90_g),
+         thirOutlet = ave(thirOutlet, storm, plan, FUN = cumsum),
+         fourOutlet = case_when(river == "1-7" ~ removal_k90_g*24,
+                                river == "2-2" ~ removal_k90_g*6,
+                                river == "3-1" ~ removal_k90_g*2,
+                                river == "4-1" ~ removal_k90_g),
+         fourOutlet = ave(fourOutlet, storm, plan, FUN = cumsum))%>%
+  group_by(storm, plan)%>%
+  #percent removal by watershed order
+  mutate(k90_pRem = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k90_g/(Q2_load1/24))*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k90_g/(Q1_load1/24))*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k90_g/(Q0.5_load1/24))*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k90_g/(Qm_load1/24))*100,
+                     river == "2-2" & storm == "Q2" ~ (secOutlet/((Q2_load1/6)+(Q2_load2/6)))*100,
+                     river == "2-2" & storm == "Q1" ~ (secOutlet/((Q1_load1/6)+(Q1_load2/6)))*100,
+                     river == "2-2" & storm == "Q0.5" ~ (secOutlet/((Q0.5_load1/6)+(Q0.5_load2/6)))*100,
+                     river == "2-2" & storm == "Qm" ~ (secOutlet/((Qm_load1/6)+(Qm_load2/6)))*100,
+                     river == "3-1" & storm == "Q2" ~ (thirOutlet/((Q2_load1/2)+(Q2_load2/2)+(Q2_load3/2)))*100,
+                     river == "3-1" & storm == "Q1" ~ (thirOutlet/((Q1_load1/2)+(Q1_load2/2)+(Q1_load3/2)))*100,
+                     river == "3-1" & storm == "Q0.5" ~ (thirOutlet/((Q0.5_load1/2)+(Q0.5_load2/2)+(Q0.5_load3/2)))*100,
+                     river == "3-1" & storm == "Qm" ~ (thirOutlet/((Qm_load1/2)+(Qm_load2/2)+(Qm_load3/2)))*100,
+                     river == "4-1" & storm == "Q2" ~ (fourOutlet/Q2_watershed_load)*100,
+                     river == "4-1" & storm == "Q1" ~ (fourOutlet/Q1_watershed_load)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (fourOutlet/Q0.5_watershed_load)*100,
+                     river == "4-1" & storm == "Qm" ~ (fourOutlet/Qm_watershed_load)*100))%>%
+   mutate(restLoc = 
+           case_when(startsWith(plan, "unr") ~ "unr",
+                     startsWith(plan, "1st") ~ "1st",
+                     startsWith(plan, "2nd") ~ "2nd",
+                     startsWith(plan, "3rd") ~ "3rd",
+                     startsWith(plan, "4th") ~ "4th"))%>% 
+  mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
+                                 endsWith(plan, "80p")~ 80,
+                                 endsWith(plan, "60p")~ 60,
+                                 endsWith(plan, "40p")~ 40,
+                                 endsWith(plan, "20p")~ 20,
+                                 endsWith(plan, "unr")~ 0))
+
+# save(monitorSO,
+#      file = "C:/Users/morganao/Documents/CBT_Oehler2023/9_Saved_Dataframes/monitorSO.RData")
+
+```
+
+#km
+```{r}
+monitorSO$storm <- factor(monitorSO$storm,                 # Re-level group factor
+                         levels = c("Q2", "Q1", "Q0.5", "Qm"))
+#1
+one <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "1st")%>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%NO3 Removed from\n a 1st-order Watershed")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "Tot Length of 1st-order\n Rivers Restored [km]", breaks = seq(0,50,10)))+
+  theme(aspect.ratio = 1)
+#5
+five <-  monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "1st")%>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%NO3 Removed from\n a 2nd-order Watershed")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "", breaks = seq(0,50,10)))+
+  theme(aspect.ratio = 1)
+#9
+nine <-  monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "1st")%>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%NO3 Removed from\n a 3rd-order Watershed")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "", breaks = seq(0,50,10)))+
+  theme(aspect.ratio = 1)
+#13
+thirteen <-  monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "1st")%>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.2)+
+  xlab("% of 1st-order\n Streams Restored")+
+  ylab("%NO3 Removed from\n a 4th-order Watershed")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "", breaks = seq(0,50,10)))+
+  theme(aspect.ratio = 1)
+
+
+#2
+two <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "2nd")%>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "Tot Length of 2nd-order\n Rivers Restored [km]", breaks = seq(0,35,5)))+
+  theme(aspect.ratio = 1)
+#6
+six <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "2nd")%>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "", breaks = seq(0,35,5)))+
+  theme(aspect.ratio = 1)
+#10
+ten <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "2nd")%>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "", breaks = seq(0,35,5)))+
+  theme(aspect.ratio = 1)
+#14
+fourteen <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "2nd")%>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.2)+
+  xlab("% of 2nd-order\n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "", breaks = seq(0,35,5)))+
+  theme(aspect.ratio = 1)
+
+#3
+three <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "3rd")%>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "Tot Length of 3rd-order\n Rivers Restored [km]", breaks = seq(0,30,5)))+
+  theme(aspect.ratio = 1)
+#7
+seven <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "3rd")%>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "", breaks = seq(0,30,5)))+
+  theme(aspect.ratio = 1)
+#11
+eleven <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "3rd")%>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "", breaks = seq(0,30,5)))+
+  theme(aspect.ratio = 1)
+#15
+fifteen <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "3rd")%>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.2)+
+  xlab("% of 3rd-order\n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "", breaks = seq(0,30,5)))+
+  theme(aspect.ratio = 1)
+
+#4
+four <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "4th")%>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "Tot Length of 4th-order\n River Restored [km]", breaks = seq(0,35,5)))+
+  theme(aspect.ratio = 1)
+#8
+eight <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "4th")%>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "", breaks = seq(0,35,5)))+
+  theme(aspect.ratio = 1)
+#12
+twelve <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "4th")%>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "", breaks = seq(0,35,5)))+
+  theme(aspect.ratio = 1)
+#16
+sixteen <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "4th")%>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.2)+
+  xlab("% of 4th-order \n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "", breaks = seq(0,35,5)))+
+  theme(aspect.ratio = 1)
+
+one+  theme(text =    element_text(size = 4))+
+two+  theme(text =    element_text(size = 4))+
+three+theme(text =    element_text(size = 4))+
+four+ theme(text =    element_text(size = 4))+
+five+ theme(text =    element_text(size = 4))+
+six+  theme(text =    element_text(size = 4))+
+seven+theme(text =    element_text(size = 4))+
+eight+theme(text =    element_text(size = 4))+
+nine+ theme(text =    element_text(size = 4))+
+ten+  theme(text =    element_text(size = 4))+
+eleven +theme(text =  element_text(size = 4))+ 
+twelve +theme(text =  element_text(size = 4))+ 
+thirteen+theme(text = element_text(size = 4))+
+fourteen+theme(text = element_text(size = 4))+
+fifteen+theme(text =  element_text(size = 4))+
+sixteen+theme(text =  element_text(size = 4))+
+          plot_layout(ncol = 4, guides = "collect")+
+          plot_annotation(title = '%NO3 Load Removed by Watershed Order', 
+                          subtitle = "Median removal rate, 1mgL background concentration ",
+                          theme = theme(title = element_text(size = 8, face = 2)))&
+   ylim(0,1)
+
+ggsave("Exports/monitoring_km_uni.png", dpi=500, units="in")
+```
+
+#k90
+```{r}
+monitorSO$storm <- factor(monitorSO$storm,                 # Re-level group factor
+                         levels = c("Q2", "Q1", "Q0.5", "Qm"))
+#1
+one <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "1st")%>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y =  k90_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%NO3 Removed from\n a 1st-order Watershed")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "Tot Length of 1st-order\n Rivers Restored [km]", breaks = seq(0,50,10)))+
+  theme(aspect.ratio = 1)
+#5
+five <-  monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "1st")%>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y =  k90_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%NO3 Removed from\n a 2nd-order Watershed")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "", breaks = seq(0,50,10)))+
+  theme(aspect.ratio = 1)
+#9
+nine <-  monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "1st")%>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y =  k90_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab("%NO3 Removed from\n a 3rd-order Watershed")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "", breaks = seq(0,50,10)))+
+  theme(aspect.ratio = 1)
+#13
+thirteen <-  monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "1st")%>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y =  k90_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pRem, color = storm), size = 0.2)+
+  xlab("% of 1st-order\n Streams Restored")+
+  ylab("%NO3 Removed from\n a 4th-order Watershed")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "", breaks = seq(0,50,10)))+
+  theme(aspect.ratio = 1)
+
+
+#2
+two <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "2nd")%>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y =  k90_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "Tot Length of 2nd-order\n Rivers Restored [km]", breaks = seq(0,35,5)))+
+  theme(aspect.ratio = 1)
+#6
+six <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "2nd")%>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y =  k90_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "", breaks = seq(0,35,5)))+
+  theme(aspect.ratio = 1)
+#10
+ten <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "2nd")%>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y =  k90_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "", breaks = seq(0,35,5)))+
+  theme(aspect.ratio = 1)
+#14
+fourteen <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "2nd")%>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y =  k90_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pRem, color = storm), size = 0.2)+
+  xlab("% of 2nd-order\n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "", breaks = seq(0,35,5)))+
+  theme(aspect.ratio = 1)
+
+#3
+three <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "3rd")%>%
+  filter(river == "1-7") %>%
+  ggplot()+
+  geom_line(aes(x = percentRest, y =  k90_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "Tot Length of 3rd-order\n Rivers Restored [km]", breaks = seq(0,30,5)))+
+  theme(aspect.ratio = 1)
+#7
+seven <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "3rd")%>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y =  k90_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "", breaks = seq(0,30,5)))+
+  theme(aspect.ratio = 1)
+#11
+eleven <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "3rd")%>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y =  k90_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "", breaks = seq(0,30,5)))+
+  theme(aspect.ratio = 1)
+#15
+fifteen <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "3rd")%>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y =  k90_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pRem, color = storm), size = 0.2)+
+  xlab("% of 3rd-order\n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "", breaks = seq(0,30,5)))+
+  theme(aspect.ratio = 1)
+
+#4
+four <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "4th")%>%
+  filter(river == "1-7") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y =  k90_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "Tot Length of 4th-order\n River Restored [km]", breaks = seq(0,35,5)))+
+  theme(aspect.ratio = 1)
+#8
+eight <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "4th")%>%
+  filter(river == "2-2") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y =  k90_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "", breaks = seq(0,35,5)))+
+  theme(aspect.ratio = 1)
+#12
+twelve <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "4th")%>%
+  filter(river == "3-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y =  k90_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pRem, color = storm), size = 0.2)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "", breaks = seq(0,35,5)))+
+  theme(aspect.ratio = 1)
+#16
+sixteen <- monitorSO %>%
+  filter(restLoc == "unr" | restLoc == "4th")%>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y =  k90_pRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = percentRest, y = k90_pRem, color = storm), size = 0.2)+
+  xlab("% of 4th-order \n Streams Restored")+
+  ylab(element_blank())+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "", breaks = seq(0,35,5)))+
+  theme(aspect.ratio = 1)
+
+one+  theme(text =    element_text(size = 4))+
+two+  theme(text =    element_text(size = 4))+
+three+theme(text =    element_text(size = 4))+
+four+ theme(text =    element_text(size = 4))+
+five+ theme(text =    element_text(size = 4))+
+six+  theme(text =    element_text(size = 4))+
+seven+theme(text =    element_text(size = 4))+
+eight+theme(text =    element_text(size = 4))+
+nine+ theme(text =    element_text(size = 4))+
+ten+  theme(text =    element_text(size = 4))+
+eleven +theme(text =  element_text(size = 4))+ 
+twelve +theme(text =  element_text(size = 4))+ 
+thirteen+theme(text = element_text(size = 4))+
+fourteen+theme(text = element_text(size = 4))+
+fifteen+theme(text =  element_text(size = 4))+
+sixteen+theme(text =  element_text(size = 4))+
+          plot_layout(ncol = 4, guides = "collect")+
+          plot_annotation(title = '%NO3 Load Removed by Watershed Order', 
+                          subtitle = "90th Percentile removal rate, 1mgL background concentration ",
+                          theme = theme(title = element_text(size = 8, face = 2))) &
+    ylim(0,20)
+
+ggsave("Exports/monitoring_k90_uni.png", dpi=500, units="in")
+```

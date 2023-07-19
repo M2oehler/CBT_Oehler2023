@@ -1,0 +1,287 @@
+---
+title: "Full Restoration Plots"
+output: html_document
+date: "2023-07-03"
+---
+
+#Housekeeping
+```{r}
+library(patchwork)
+```
+
+
+```{r}
+# Reordering storms so plots have them in order
+NO3_Full$storm <- factor(NO3_Full$storm,                 # Re-level group factor
+                         levels = c("Q2", "Q1", "Q0.5", "Qm"))
+
+NO3_Full <-   NO3_Full %>% 
+    transform(k10_PerCumRem = ave(k10_percentWLR, storm, plan, FUN = cumsum),
+              km_PerCumRem = ave(km_percentWLR, storm, plan, FUN = cumsum),
+              k90_PerCumRem = ave(k90_percentWLR, storm, plan, FUN = cumsum)) %>%
+  mutate(plan = 
+           case_when(
+             startsWith(plan, "full-") ~ substring(plan, first = 6, last = nchar(plan)),
+         TRUE ~ plan)) %>%
+  mutate(restLoc = 
+           case_when(startsWith(plan, "unr") ~ "1st",
+                     startsWith(plan, "1st") ~ "1st",
+                     startsWith(plan, "2nd") ~ "2nd",
+                     startsWith(plan, "3rd") ~ "3rd",
+                     startsWith(plan, "4th") ~ "4th")) #adding column for facets but didnt end up plotting this way
+```
+
+
+```{r}
+# Full_cumu %>%
+#   ggplot()+
+#   geom_line(aes(x = PerShedRest, y = km_PcumRemoval, color = storm), linewidth = 0.5)+
+#   geom_point(aes(x = PerShedRest, y = km_PcumRemoval, color = storm), size = 0.2)+
+#   facet_grid(order ~ restLoc, scales = "free")+
+#   xlab("Percent of the Full Watershed Restored")+
+#   ylab("Percent ")
+#gonna hvae to make a plot for each to have it look how I want
+```
+#Cumulative removal matrix
+```{r}
+#1
+one <- NO3_Full %>%
+  filter(river == "1-7" & restLoc == "1st") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("")+
+  ylab("%Watershed NO3 Removed \n U.S. of 1st order outlets")+
+  #ylim(0,1.5)+
+  xlim(0, 35)+
+        theme(aspect.ratio = 1)
+#5
+five <- NO3_Full %>%
+  filter(river == "2-2" & restLoc == "1st") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("")+
+  ylab("%Watershed NO3 Removed \n U.S. of 2nd order outlets")+
+#ylim(0,1.5)+
+  xlim(0, 35)+
+        theme(aspect.ratio = 1)
+#9
+nine <- NO3_Full %>%
+  filter(river == "3-1" & restLoc == "1st") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("")+
+  ylab("%Watershed NO3 Removed\n U.S. of 3rd order outlets")+
+ #ylim(0,1.5)+
+  xlim(0, 35)+
+        theme(aspect.ratio = 1)
+#13
+thirteen <- NO3_Full %>%
+  filter(river == "4-1" & restLoc == "1st") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("")+
+  ylab("%Watershed NO3 Removed \n U.S. of 4th order outlet")+
+ #ylim(0,1.5)+
+  xlim(0, 35)+
+        theme(aspect.ratio = 1)
+
+#2
+two <- NO3_Full %>%
+  filter(river == "1-7" & restLoc == "2nd") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("")+
+  ylab(element_blank())+
+#ylim(0,1.5)+
+  xlim(36,60)+
+        theme(aspect.ratio = 1)
+#6
+six <- NO3_Full %>%
+  filter(river == "2-2" & restLoc == "2nd") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("")+
+  ylab(element_blank())+
+ #ylim(0,1.5)+
+  xlim(36,60)+
+        theme(aspect.ratio = 1)
+#10
+ten <- NO3_Full %>%
+  filter(river == "3-1" & restLoc == "2nd") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("")+
+  ylab(element_blank())+
+ #ylim(0,1.5)+
+  xlim(36,60)+
+        theme(aspect.ratio = 1)
+#14
+fourteen <- NO3_Full %>%
+  filter(river == "4-1" & restLoc == "2nd") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("")+
+  ylab(element_blank())+
+ #ylim(0,1.5)+
+  xlim(36,60)+
+        theme(aspect.ratio = 1)
+
+#3
+three <- NO3_Full %>%
+  filter(river == "1-7" & restLoc == "3rd") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("")+
+  ylab(element_blank())+
+ #ylim(0,1.5)+
+  xlim(61,76)+
+        theme(aspect.ratio = 1)
+#7
+seven <- NO3_Full %>%
+  filter(river == "2-2" & restLoc == "3rd") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("")+
+  ylab(element_blank())+
+ # ylim(0,1.5)+
+  xlim(61,76)+
+        theme(aspect.ratio = 1)
+#11
+eleven <- NO3_Full %>%
+  filter(river == "3-1" & restLoc == "3rd") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("")+
+  ylab(element_blank())+
+ #ylim(0,1.5)+
+  xlim(61,76)+
+        theme(aspect.ratio = 1)
+#15
+fifteen <- NO3_Full %>%
+  filter(river == "4-1" & restLoc == "3rd") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("")+
+  ylab(element_blank())+
+ #ylim(0,1.5)+
+  xlim(61,76)+
+        theme(aspect.ratio = 1)
+
+#4
+four <- NO3_Full %>%
+  filter(river == "1-7" & restLoc == "4th") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("")+
+  ylab(element_blank())+
+  #ylim(0,1.5)+
+  xlim(77, 100)+
+        theme(aspect.ratio = 1)
+#8
+eight <- NO3_Full %>%
+  filter(river == "2-2" & restLoc == "4th") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("")+
+  ylab(element_blank())+
+ #ylim(0,1.5)+
+  xlim(77, 100)+
+        theme(aspect.ratio = 1)
+#12
+twelve <- NO3_Full %>%
+  filter(river == "3-1" & restLoc == "4th") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("")+
+  ylab(element_blank())+
+  xlim(77, 100)+
+  #ylim(0,1.5)+
+        theme(aspect.ratio = 1)
+#16
+sixteen <- NO3_Full %>%
+  filter(river == "4-1" & restLoc == "4th") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = km_PerCumRem, color = storm), size = 0.2)+
+  xlab("")+
+  ylab(element_blank())+
+  #ylim(0,1.5)+
+  xlim(77, 100)+
+        theme(aspect.ratio = 1)
+
+
+one+theme(text = element_text(size = 5))+
+two+theme(text = element_text(size = 5))+
+three+theme(text = element_text(size = 5))+
+four+theme(text = element_text(size = 5))+
+five+theme(text = element_text(size = 5))+
+six+theme(text = element_text(size = 5))+
+seven+theme(text = element_text(size = 5))+
+eight+theme(text = element_text(size = 5))+
+nine+theme(text = element_text(size = 5))+
+ten+theme(text = element_text(size = 5))+
+eleven +theme(text = element_text(size = 5))+ 
+twelve +theme(text = element_text(size = 5))+ 
+thirteen+theme(text = element_text(size = 5))+
+fourteen+theme(text = element_text(size = 5))+
+fifteen+theme(text = element_text(size = 5))+
+sixteen+theme(text = element_text(size = 5))+
+            plot_layout(ncol = 4, guides = "collect")+
+            plot_annotation(title = 'Incremental Full Restoration of the Watershed',
+                            subtitle = "Percent Watershed NO3 Cumulatively Removaled (km)",
+                            caption = 'U.S.- up stream',
+                            theme = theme(title = element_text(size = 8, face = 2)))+
+  xlab("Percent of Full Watershed Restored") 
+ggsave("Exports/Full_matrix_km_non.png", dpi=500,  units="in")
+```
+
+```{r}
+NO3_Full %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = k10_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = k10_PerCumRem, color = storm, shape = restLoc), size = 0.8)+
+  xlab("Percent of Full Watershed Restored")+
+  ylab("Percent NO3 Removed from the Watershed")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~.*130.454/100, name = "Watershed Length Restored [km]", breaks = seq(0,135,10)))+
+  ggtitle("Incremental Full Restoration of the Watershed \n %NO3 Removed at the Outlet (k10)")
+ggsave("Exports/Full_k10.png", dpi=500,  units="in")
+
+NO3_Full %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = km_PerCumRem, color = storm, shape = restLoc), size = 0.8)+
+  xlab("Percent of Full Watershed Restored")+
+  ylab("Percent NO3 Removed from the Watershed")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~.*130.454/100, name = "Watershed Length Restored [km]", breaks = seq(0,135,10)))+
+  ggtitle("Incremental Full Restoration of the Watershed \n %NO3 Removed at the Outlet (km)")
+ggsave("Exports/Full_km.png", dpi=500,  units="in")
+
+NO3_Full %>%
+  filter(river == "4-1") %>%
+  ggplot() +
+  geom_line(aes(x = PerShedRest, y = k90_PerCumRem, color = storm), linewidth = 0.5)+
+  geom_point(aes(x = PerShedRest, y = k90_PerCumRem, color = storm, shape = restLoc), size = 0.8)+
+  xlab("Percent of Full Watershed Restored")+
+  ylab("Percent NO3 Removed from the Watershed")+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~.*130.454/100, name = "Watershed Length Restored [km]", breaks = seq(0,135,10)))+
+  ggtitle("Incremental Full Restoration of the Watershed \n %NO3 Removed at the Outlet (k90)")
+ggsave("Exports/Full_k90.png", dpi=500,  units="in")
+```
+
