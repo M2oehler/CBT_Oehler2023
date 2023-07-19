@@ -1,0 +1,2049 @@
+---
+title: "Removal by Individual Order Restoration"
+output: html_document
+date: "2023-05-23"
+---
+
+#Housekeeping:
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(dplyr)
+library(tidyverse)
+library(stringr)
+library(tidyr)
+
+library(readr)
+theme_set(theme_classic())
+
+#removal rates in mg-N/ft2.hr. Converted to g in the removal calc below.
+k10 <- 0.0067
+km <- 0.061
+k90 <- 1.3
+Xcs <- 50 #Distance between cross sections (ft)
+
+
+```
+
+#Incremental 1st- Order Restoration
+##Read in data from text files:
+```{r}
+#Make vector of file names, then convert to DF and include the location to use later to read in the files.I just changes the name of the dataframe and folders to load the other order restoration files.
+raw.files <- tibble(filename = list.files("TextFiles2ndO/"))
+raw.file.paths <- raw.files  %>%
+  mutate(filepath = paste0("TextFiles2ndO/", filename))
+
+
+#Read in and combine files into one df (~15 min on Mac, ~10 min on DELL)
+RAS_2ndO <- NULL
+for (f in raw.file.paths$filepath) {
+  dat <- read_fwf(f, 
+                  skip = 12, 
+                  fwf_widths(c(10, 20, 15, 4, 9),
+                    col_names = c("reach", "STA", "day", "time", "wettedFPw")), 
+                    col_types = cols(reach = "c", STA = "c", day = "c", time = "c", wettedFPw = "n")) %>%
+         mutate(plan = f)
+   RAS_2ndO <- bind_rows(RAS_2ndO, dat)
+}
+
+#Editing (Cant run separate wider or the sub string arguments multiple times. It will keep altering beyond the desired outcome)
+RAS_2ndO <- RAS_2ndO %>%
+  drop_na(STA) %>%
+  mutate(STA = 
+           case_when(
+             endsWith(STA, ".*") ~ substr(STA, 1, nchar(STA)-2),
+             endsWith(STA, ".0*") ~ substr(STA, 1, nchar(STA)-3),
+             endsWith(STA, ".00*") ~ substr(STA, 1, nchar(STA)-4),
+             TRUE ~ STA) ) %>%
+  separate_wider_delim(plan, 
+                       delim = "_", names = c("river", "storm", "plan")) %>%
+  mutate(river = 
+           substring(river,
+                     first = 15,
+                     last = 17), 
+         plan = 
+           case_when(river == "3-1" | river == "4-1" 
+                                  ~ substr(plan, 1, nchar(plan)-6), 
+                     TRUE 
+                                  ~ substr(plan, 1, nchar(plan)-4))) 
+
+RAS_2ndO$STA <- as.numeric(RAS_2ndO$STA)
+rm(dat, raw.file.paths, raw.files)
+```
+
+
+#Save data frames to later be called back into the environment
+```{r}
+# save(RAS_1stO, RAS_2ndO, RAS_3rdO, RAS_4thO,
+#     file = "C:/Users/morganao/Documents/CBT_Oehler2023/9_Saved_Dataframes/SO_RAS_rawData.RData")
+
+#Contains data for load removal (g), watershed removal(%), and local removal (%) for 3 removal rates and 3 source concentrations.
+# save(NO3_1stO, NO3_2ndO, NO3_3rdO, NO3_4thO,
+#     file = "C:/Users/morganao/Documents/CBT_Oehler2023/9_Saved_Dataframes/SO_NO3_removals.RData")
+
+#Ran the nitrate code partially to save dataframes of just the inundation times
+# save(inun_1stO, inun_2ndO, inun_3rdO, inun_4thO,
+#     file = "C:/Users/morganao/Documents/CBT_Oehler2023/9_Saved_Dataframes/SO_InunTimes.RData")
+```
+
+
+
+#%NO3 Removal by 1st Order River Restoration. Produces load removals in the entire order (runtime: ~3min if have raw data loaded)
+```{r}
+#Nitrate loads for 1mg/L source concentration(g)
+Q2_watershed_load <- 4563108 #total NO3 load to the watershed (grams)
+Q2_load1 <- 141902 #input load to a all first order streams (grams)
+Q2_load2 <- 120581 #input load to a all second order streams (grams)
+Q2_load3 <- 680432 #input load to a all third order streams (grams)
+Q2_load4 <- 3620193 #input load to the fourth order stream (grams)
+
+Q1_watershed_load <- 3653361 #total NO3 load to the watershed (grams)
+Q1_load1 <- 102974 #input load to a all first order streams (grams)
+Q1_load2 <- 126125 #input load to a all second order streams (grams)
+Q1_load3 <- 545822 #input load to a all third order streams (grams)
+Q1_load4 <- 2878440 #input load to the fourth order stream (grams)
+
+Q0.5_watershed_load <- 2262609 #total NO3 load to the watershed (grams)
+Q0.5_load1 <- 91515 #input load to a all first order streams (grams)
+Q0.5_load2 <- 74539 #input load to a all second order streams (grams)
+Q0.5_load3 <- 325804 #input load to a all third order streams (grams)
+Q0.5_load4 <- 1770751 #input load to the fourth order stream (grams)
+
+Qm_watershed_load <- 245161 #total NO3 load to the watershed (grams)
+Qm_load1 <- 65880 #input load to a all first order streams (grams)
+Qm_load2 <- 3003 #input load to a all second order streams (grams)
+Qm_load3 <- 26865 #input load to a all third order streams (grams)
+Qm_load4 <- 149414 #input load to the fourth order stream (grams)
+
+#WLR= watershed load removed; OLR= order load removed
+NO3_1stO <- RAS_1stO %>%
+  group_by(storm, plan, STA, river) %>%
+  mutate(
+    ti_min = case_when(wettedFPw >= 15 ~ 15)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(
+    FP_width = 
+           case_when(
+             plan == "unr" & river == "1-7" ~ 16.5, 
+             plan == "1st-20p" & river == "1-7" & STA >= 164300 ~ 60,
+             plan == "1st-20p" & river == "1-7" & STA < 164300 ~ 16.5,
+             plan == "1st-40p" & river == "1-7" & STA >= 163100 ~ 60,
+             plan == "1st-40p" & river == "1-7" & STA < 163100 ~ 16.5,
+             plan == "1st-60p" & river == "1-7" & STA >= 161900 ~ 60,
+             plan == "1st-60p" & river == "1-7" & STA < 161900 ~ 16.5,
+             plan == "1st-80p" & river == "1-7" & STA >= 160700 ~ 60,
+             plan == "1st-80p" & river == "1-7" & STA < 160700 ~ 16.5,
+             plan == "1st-100p" & river == "1-7" ~ 60,
+             river == "2-2" ~ 34.5,
+             river == "3-1" ~ 67.5,
+             river == "4-1" ~ 126)) %>% 
+  mutate(#calculates removal at each XS along the flow path
+    k10_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                    ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                    ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+                          
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                    ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+          
+                river == "4-1" & (STA < 101000)
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000)) %>% 
+   mutate(
+    km_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+                            
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+                          
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "4-1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000)) %>% 
+  mutate(
+    k90_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+                            
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+                          
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "4-1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000)) %>% 
+  group_by(storm, plan, river) %>%
+  summarise(removal_k10_g = sum(k10_removal_g), #sums removal at each XS in a river
+            removal_km_g = sum(km_removal_g),
+            removal_k90_g = sum(k90_removal_g)) %>%
+  mutate(removal_k10_g = case_when(river == "1-7" ~ removal_k10_g*24, #scales removal to the number of rivers in the order
+                                 river == "2-2" ~ removal_k10_g*6,
+                                 river == "3-1" ~ removal_k10_g*2,
+                                 river == "4-1" ~ removal_k10_g),
+         removal_km_g = case_when(river == "1-7" ~ removal_km_g*24, 
+                                 river == "2-2" ~ removal_km_g*6,
+                                 river == "3-1" ~ removal_km_g*2,
+                                 river == "4-1" ~ removal_km_g),
+         removal_k90_g = case_when(river == "1-7" ~ removal_k90_g*24, 
+                                 river == "2-2" ~ removal_k90_g*6,
+                                 river == "3-1" ~ removal_k90_g*2,
+                                 river == "4-1" ~ removal_k90_g)) %>%
+  mutate(order = 
+           case_when(            river == "1-7" ~ "1st", 
+                                 river == "2-2" ~ "2nd",
+                                 river == "3-1" ~ "3rd",
+                                 river == "4-1" ~ "4th")) %>% 
+  mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
+                                 endsWith(plan, "80p")~ 80,
+                                 endsWith(plan, "60p")~ 60,
+                                 endsWith(plan, "40p")~ 40,
+                                 endsWith(plan, "20p")~ 20,
+                                 endsWith(plan, "unr")~ 0)) %>%
+  mutate(k10_percentWLR = case_when(storm == "Q2" ~
+                                   (removal_k10_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k10_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k10_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k10_g/Qm_watershed_load)*100),
+         km_percentWLR = case_when(storm == "Q2" ~
+                                   (removal_km_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_km_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_km_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_km_g/Qm_watershed_load)*100),
+         k90_percentWLR = case_when(storm == "Q2" ~
+                                   (removal_k90_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k90_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k90_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k90_g/Qm_watershed_load)*100)) %>%
+  mutate(k10_percentOLR = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k10_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k10_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k10_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k10_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k10_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k10_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k10_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k10_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k10_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k10_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k10_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k10_g/Qm_load4)*100),
+         km_percentOLR = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_km_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_km_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_km_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_km_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_km_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_km_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_km_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_km_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_km_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_km_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_km_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_km_g/Qm_load4)*100),
+         k90_percentOLR = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k90_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k90_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k90_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k90_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k90_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k90_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k90_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k90_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k90_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k90_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k90_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k90_g/Qm_load4)*100))
+
+#Nitrate loads for 2mg/L source concentration(g)
+Q2_watershed_load <- 9126217 #total NO3 load to the watershed (grams)
+Q2_load1 <- 283805 #input load to a all first order streams (grams)
+Q2_load2 <- 241163 #input load to a all second order streams (grams)
+Q2_load3 <- 1360864 #input load to a all third order streams (grams)
+Q2_load4 <- 7240386 #input load to the fourth order stream (grams)
+
+Q1_watershed_load <- 7306722 #total NO3 load to the watershed (grams)
+Q1_load1 <- 205948 #input load to a all first order streams (grams)
+Q1_load2 <- 252249 #input load to a all second order streams (grams)
+Q1_load3 <- 1091643 #input load to a all third order streams (grams)
+Q1_load4 <- 5756881 #input load to the fourth order stream (grams)
+
+Q0.5_watershed_load <- 4525219 #total NO3 load to the watershed (grams)
+Q0.5_load1 <- 183030 #input load to a all first order streams (grams)
+Q0.5_load2 <- 149078 #input load to a all second order streams (grams)
+Q0.5_load3 <- 651608 #input load to a all third order streams (grams)
+Q0.5_load4 <- 3541503 #input load to the fourth order stream (grams)
+
+Qm_watershed_load <- 490322 #total NO3 load to the watershed (grams)
+Qm_load1 <- 131760 #input load to a all first order streams (grams)
+Qm_load2 <- 6005 #input load to a all second order streams (grams)
+Qm_load3 <- 53730 #input load to a all third order streams (grams)
+Qm_load4 <- 298827 #input load to the fourth order stream (grams)
+
+NO3_1stO <- NO3_1stO %>%
+   mutate(k10_pWLR_2mgL = case_when(storm == "Q2" ~
+                                   (removal_k10_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k10_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k10_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k10_g/Qm_watershed_load)*100),
+         km_pWLR_2mgL = case_when(storm == "Q2" ~
+                                   (removal_km_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_km_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_km_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_km_g/Qm_watershed_load)*100),
+         k90_pWLR_2mgL = case_when(storm == "Q2" ~
+                                   (removal_k90_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k90_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k90_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k90_g/Qm_watershed_load)*100)) %>%
+  mutate(k10_pOLR_2mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k10_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k10_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k10_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k10_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k10_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k10_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k10_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k10_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k10_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k10_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k10_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k10_g/Qm_load4)*100),
+         km_pOLR_2mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_km_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_km_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_km_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_km_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_km_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_km_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_km_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_km_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_km_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_km_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_km_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_km_g/Qm_load4)*100),
+         k90_pOLR_2mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k90_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k90_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k90_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k90_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k90_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k90_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k90_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k90_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k90_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k90_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k90_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k90_g/Qm_load4)*100))
+
+#Nitrate loads for 0.5mg/L source concentration(g)
+Q2_watershed_load <- 2281554 #total NO3 load to the watershed (grams)
+Q2_load1 <- 70951 #input load to a all first order streams (grams)
+Q2_load2 <- 60291 #input load to a all second order streams (grams)
+Q2_load3 <- 340216 #input load to a all third order streams (grams)
+Q2_load4 <- 1810096 #input load to the fourth order stream (grams)
+
+Q1_watershed_load <- 1826680 #total NO3 load to the watershed (grams)
+Q1_load1 <- 51487 #input load to a all first order streams (grams)
+Q1_load2 <- 63062 #input load to a all second order streams (grams)
+Q1_load3 <- 272911 #input load to a all third order streams (grams)
+Q1_load4 <- 1439220 #input load to the fourth order stream (grams)
+
+Q0.5_watershed_load <- 1131305 #total NO3 load to the watershed (grams)
+Q0.5_load1 <- 45757 #input load to a all first order streams (grams)
+Q0.5_load2 <- 37270 #input load to a all second order streams (grams)
+Q0.5_load3 <- 162902 #input load to a all third order streams (grams)
+Q0.5_load4 <- 885376 #input load to the fourth order stream (grams)
+
+Qm_watershed_load <- 122581 #total NO3 load to the watershed (grams)
+Qm_load1 <- 32940 #input load to a all first order streams (grams)
+Qm_load2 <- 1501 #input load to a all second order streams (grams)
+Qm_load3 <- 13432 #input load to a all third order streams (grams)
+Qm_load4 <- 74707 #input load to the fourth order stream (grams)
+
+NO3_1stO <- NO3_1stO %>%
+   mutate(k10_pWLR_.5mgL = case_when(storm == "Q2" ~
+                                   (removal_k10_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k10_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k10_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k10_g/Qm_watershed_load)*100),
+         km_pWLR_.5mgL = case_when(storm == "Q2" ~
+                                   (removal_km_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_km_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_km_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_km_g/Qm_watershed_load)*100),
+         k90_pWLR_.5mgL = case_when(storm == "Q2" ~
+                                   (removal_k90_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k90_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k90_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k90_g/Qm_watershed_load)*100)) %>%
+  mutate(k10_pOLR_.5mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k10_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k10_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k10_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k10_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k10_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k10_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k10_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k10_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k10_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k10_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k10_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k10_g/Qm_load4)*100),
+         km_pOLR_.5mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_km_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_km_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_km_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_km_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_km_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_km_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_km_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_km_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_km_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_km_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_km_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_km_g/Qm_load4)*100),
+         k90_pOLR_.5mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k90_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k90_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k90_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k90_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k90_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k90_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k90_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k90_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k90_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k90_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k90_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k90_g/Qm_load4)*100))
+#Rounding:
+  # mutate_if(is.numeric, # Using dplyr functions
+  #           round,
+  #           digits = 2)
+
+#Checked to make sure all STAs were present for 4-1. Correct number of rows (101000/50 = 2020)
+#sort <- NO3_1stO[order(NO3_1stO$STA, na.last=FALSE, decreasing = TRUE),] %>% filter(river =="4-1" & plan == "unr" & storm == "Q1")
+#Checked that the text file calcs matched the csv calcs. I binded the csvs into one DF below to use the same code.
+#Q1stO <- Q1stO %>% drop_na(STA)
+#filter(Q1stO, river == "NA")
+```
+
+#%NO3 Removal by 2nd Order River Restoration. Produces load removals in the entire order.
+```{r}
+#Realised the single order 2nd-40p was also unstable so removing it from the dataframe
+# NO3_2ndO <- RAS_2ndO[!(RAS_2ndO$plan=="2nd-40p"),]
+
+#Nitrate loads for 1mg/L source concentration(g)
+Q2_watershed_load <- 4563108 #total NO3 load to the watershed (grams)
+Q2_load1 <- 141902 #input load to a all first order streams (grams)
+Q2_load2 <- 120581 #input load to a all second order streams (grams)
+Q2_load3 <- 680432 #input load to a all third order streams (grams)
+Q2_load4 <- 3620193 #input load to the fourth order stream (grams)
+
+Q1_watershed_load <- 3653361 #total NO3 load to the watershed (grams)
+Q1_load1 <- 102974 #input load to a all first order streams (grams)
+Q1_load2 <- 126125 #input load to a all second order streams (grams)
+Q1_load3 <- 545822 #input load to a all third order streams (grams)
+Q1_load4 <- 2878440 #input load to the fourth order stream (grams)
+
+Q0.5_watershed_load <- 2262609 #total NO3 load to the watershed (grams)
+Q0.5_load1 <- 91515 #input load to a all first order streams (grams)
+Q0.5_load2 <- 74539 #input load to a all second order streams (grams)
+Q0.5_load3 <- 325804 #input load to a all third order streams (grams)
+Q0.5_load4 <- 1770751 #input load to the fourth order stream (grams)
+
+Qm_watershed_load <- 245161 #total NO3 load to the watershed (grams)
+Qm_load1 <- 65880 #input load to a all first order streams (grams)
+Qm_load2 <- 3003 #input load to a all second order streams (grams)
+Qm_load3 <- 26865 #input load to a all third order streams (grams)
+Qm_load4 <- 149414 #input load to the fourth order stream (grams)
+
+#WLR= watershed load removed; OLR= order load removed
+NO3_2ndO <- RAS_2ndO %>%
+  group_by(storm, plan, STA, river) %>%
+  mutate(
+    ti_min = case_when(wettedFPw >= 15 ~ 15)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(
+    FP_width = 
+           case_when(
+             river == "1-7" ~ 16.5,
+             plan == "unr" & river == "2-2" ~ 34.5, 
+             plan == "2nd-20p" & river == "2-2" & STA >= 156200 ~ 65,
+             plan == "2nd-20p" & river == "2-2" & STA < 156200 ~ 34.5,
+             # plan == "2nd-40p" & river == "2-2" & STA >= 152900 ~ 65,
+             # plan == "2nd-40p" & river == "2-2" & STA < 152900 ~ 34.5,
+             plan == "2nd-60p" & river == "2-2" & STA >= 149600 ~ 65,
+             plan == "2nd-60p" & river == "2-2" & STA < 149600 ~ 34.5,
+             plan == "2nd-80p" & river == "2-2" & STA >= 146300 ~ 65,
+             plan == "2nd-80p" & river == "2-2" & STA < 146300 ~ 34.5,
+             plan == "2nd-100p" & river == "2-2" ~ 65,
+             river == "3-1" ~ 67.5,
+             river == "4-1" ~ 126)) %>% 
+  mutate(
+    k10_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                    ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                    ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+                          
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                    ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+          
+                river == "4-1" & (STA < 101000)
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000)) %>% 
+   mutate(
+    km_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+                            
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+                          
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "4-1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000)) %>% 
+  mutate(
+    k90_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+                            
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+                          
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "4-1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000)) %>% 
+  group_by(storm, plan, river) %>%
+  summarise(removal_k10_g = sum(k10_removal_g),
+            removal_km_g = sum(km_removal_g),
+            removal_k90_g = sum(k90_removal_g)) %>%
+  mutate(removal_k10_g = case_when(river == "1-7" ~ removal_k10_g*24, 
+                                 river == "2-2" ~ removal_k10_g*6,
+                                 river == "3-1" ~ removal_k10_g*2,
+                                 river == "4-1" ~ removal_k10_g),
+         removal_km_g = case_when(river == "1-7" ~ removal_km_g*24, 
+                                 river == "2-2" ~ removal_km_g*6,
+                                 river == "3-1" ~ removal_km_g*2,
+                                 river == "4-1" ~ removal_km_g),
+         removal_k90_g = case_when(river == "1-7" ~ removal_k90_g*24, 
+                                 river == "2-2" ~ removal_k90_g*6,
+                                 river == "3-1" ~ removal_k90_g*2,
+                                 river == "4-1" ~ removal_k90_g)) %>%
+  mutate(order = 
+           case_when(            river == "1-7" ~ "1st", 
+                                 river == "2-2" ~ "2nd",
+                                 river == "3-1" ~ "3rd",
+                                 river == "4-1" ~ "4th")) %>% 
+  mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
+                                 endsWith(plan, "80p")~ 80,
+                                 endsWith(plan, "60p")~ 60,
+                                 endsWith(plan, "40p")~ 40,
+                                 endsWith(plan, "20p")~ 20,
+                                 endsWith(plan, "unr")~ 0)) %>%
+  mutate(k10_percentWLR = case_when(storm == "Q2" ~
+                                   (removal_k10_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k10_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k10_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k10_g/Qm_watershed_load)*100),
+         km_percentWLR = case_when(storm == "Q2" ~
+                                   (removal_km_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_km_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_km_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_km_g/Qm_watershed_load)*100),
+         k90_percentWLR = case_when(storm == "Q2" ~
+                                   (removal_k90_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k90_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k90_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k90_g/Qm_watershed_load)*100)) %>%
+  mutate(k10_percentOLR = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k10_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k10_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k10_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k10_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k10_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k10_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k10_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k10_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k10_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k10_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k10_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k10_g/Qm_load4)*100),
+         km_percentOLR = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_km_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_km_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_km_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_km_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_km_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_km_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_km_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_km_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_km_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_km_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_km_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_km_g/Qm_load4)*100),
+         k90_percentOLR = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k90_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k90_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k90_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k90_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k90_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k90_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k90_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k90_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k90_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k90_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k90_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k90_g/Qm_load4)*100))
+
+#Nitrate loads for 2mg/L source concentration(g)
+Q2_watershed_load <- 9126217 #total NO3 load to the watershed (grams)
+Q2_load1 <- 283805 #input load to a all first order streams (grams)
+Q2_load2 <- 241163 #input load to a all second order streams (grams)
+Q2_load3 <- 1360864 #input load to a all third order streams (grams)
+Q2_load4 <- 7240386 #input load to the fourth order stream (grams)
+
+Q1_watershed_load <- 7306722 #total NO3 load to the watershed (grams)
+Q1_load1 <- 205948 #input load to a all first order streams (grams)
+Q1_load2 <- 252249 #input load to a all second order streams (grams)
+Q1_load3 <- 1091643 #input load to a all third order streams (grams)
+Q1_load4 <- 5756881 #input load to the fourth order stream (grams)
+
+Q0.5_watershed_load <- 4525219 #total NO3 load to the watershed (grams)
+Q0.5_load1 <- 183030 #input load to a all first order streams (grams)
+Q0.5_load2 <- 149078 #input load to a all second order streams (grams)
+Q0.5_load3 <- 651608 #input load to a all third order streams (grams)
+Q0.5_load4 <- 3541503 #input load to the fourth order stream (grams)
+
+Qm_watershed_load <- 490322 #total NO3 load to the watershed (grams)
+Qm_load1 <- 131760 #input load to a all first order streams (grams)
+Qm_load2 <- 6005 #input load to a all second order streams (grams)
+Qm_load3 <- 53730 #input load to a all third order streams (grams)
+Qm_load4 <- 298827 #input load to the fourth order stream (grams)
+
+NO3_2ndO <- NO3_2ndO %>%
+   mutate(k10_pWLR_2mgL = case_when(storm == "Q2" ~
+                                   (removal_k10_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k10_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k10_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k10_g/Qm_watershed_load)*100),
+         km_pWLR_2mgL = case_when(storm == "Q2" ~
+                                   (removal_km_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_km_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_km_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_km_g/Qm_watershed_load)*100),
+         k90_pWLR_2mgL = case_when(storm == "Q2" ~
+                                   (removal_k90_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k90_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k90_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k90_g/Qm_watershed_load)*100)) %>%
+  mutate(k10_pOLR_2mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k10_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k10_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k10_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k10_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k10_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k10_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k10_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k10_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k10_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k10_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k10_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k10_g/Qm_load4)*100),
+         km_pOLR_2mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_km_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_km_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_km_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_km_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_km_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_km_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_km_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_km_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_km_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_km_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_km_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_km_g/Qm_load4)*100),
+         k90_pOLR_2mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k90_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k90_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k90_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k90_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k90_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k90_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k90_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k90_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k90_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k90_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k90_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k90_g/Qm_load4)*100))
+
+#Nitrate loads for 0.5mg/L source concentration(g)
+Q2_watershed_load <- 2281554 #total NO3 load to the watershed (grams)
+Q2_load1 <- 70951 #input load to a all first order streams (grams)
+Q2_load2 <- 60291 #input load to a all second order streams (grams)
+Q2_load3 <- 340216 #input load to a all third order streams (grams)
+Q2_load4 <- 1810096 #input load to the fourth order stream (grams)
+
+Q1_watershed_load <- 1826680 #total NO3 load to the watershed (grams)
+Q1_load1 <- 51487 #input load to a all first order streams (grams)
+Q1_load2 <- 63062 #input load to a all second order streams (grams)
+Q1_load3 <- 272911 #input load to a all third order streams (grams)
+Q1_load4 <- 1439220 #input load to the fourth order stream (grams)
+
+Q0.5_watershed_load <- 1131305 #total NO3 load to the watershed (grams)
+Q0.5_load1 <- 45757 #input load to a all first order streams (grams)
+Q0.5_load2 <- 37270 #input load to a all second order streams (grams)
+Q0.5_load3 <- 162902 #input load to a all third order streams (grams)
+Q0.5_load4 <- 885376 #input load to the fourth order stream (grams)
+
+Qm_watershed_load <- 122581 #total NO3 load to the watershed (grams)
+Qm_load1 <- 32940 #input load to a all first order streams (grams)
+Qm_load2 <- 1501 #input load to a all second order streams (grams)
+Qm_load3 <- 13432 #input load to a all third order streams (grams)
+Qm_load4 <- 74707 #input load to the fourth order stream (grams)
+
+NO3_2ndO <- NO3_2ndO %>%
+   mutate(k10_pWLR_.5mgL = case_when(storm == "Q2" ~
+                                   (removal_k10_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k10_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k10_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k10_g/Qm_watershed_load)*100),
+         km_pWLR_.5mgL = case_when(storm == "Q2" ~
+                                   (removal_km_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_km_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_km_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_km_g/Qm_watershed_load)*100),
+         k90_pWLR_.5mgL = case_when(storm == "Q2" ~
+                                   (removal_k90_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k90_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k90_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k90_g/Qm_watershed_load)*100)) %>%
+  mutate(k10_pOLR_.5mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k10_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k10_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k10_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k10_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k10_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k10_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k10_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k10_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k10_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k10_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k10_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k10_g/Qm_load4)*100),
+         km_pOLR_.5mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_km_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_km_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_km_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_km_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_km_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_km_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_km_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_km_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_km_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_km_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_km_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_km_g/Qm_load4)*100),
+         k90_pOLR_.5mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k90_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k90_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k90_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k90_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k90_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k90_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k90_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k90_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k90_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k90_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k90_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k90_g/Qm_load4)*100))
+#Rounding:
+  # mutate_if(is.numeric, # Using dplyr functions
+  #           round,
+  #           digits = 2)
+```
+
+#%NO3 Removal by 3rd Order River Restoration. Produces load removals in the entire order.
+```{r}
+#Nitrate loads for 1mg/L source concentration(g)
+Q2_watershed_load <- 4563108 #total NO3 load to the watershed (grams)
+Q2_load1 <- 141902 #input load to a all first order streams (grams)
+Q2_load2 <- 120581 #input load to a all second order streams (grams)
+Q2_load3 <- 680432 #input load to a all third order streams (grams)
+Q2_load4 <- 3620193 #input load to the fourth order stream (grams)
+
+Q1_watershed_load <- 3653361 #total NO3 load to the watershed (grams)
+Q1_load1 <- 102974 #input load to a all first order streams (grams)
+Q1_load2 <- 126125 #input load to a all second order streams (grams)
+Q1_load3 <- 545822 #input load to a all third order streams (grams)
+Q1_load4 <- 2878440 #input load to the fourth order stream (grams)
+
+Q0.5_watershed_load <- 2262609 #total NO3 load to the watershed (grams)
+Q0.5_load1 <- 91515 #input load to a all first order streams (grams)
+Q0.5_load2 <- 74539 #input load to a all second order streams (grams)
+Q0.5_load3 <- 325804 #input load to a all third order streams (grams)
+Q0.5_load4 <- 1770751 #input load to the fourth order stream (grams)
+
+Qm_watershed_load <- 245161 #total NO3 load to the watershed (grams)
+Qm_load1 <- 65880 #input load to a all first order streams (grams)
+Qm_load2 <- 3003 #input load to a all second order streams (grams)
+Qm_load3 <- 26865 #input load to a all third order streams (grams)
+Qm_load4 <- 149414 #input load to the fourth order stream (grams)
+
+#WLR= watershed load removed; OLR= order load removed
+NO3_3rdO <- RAS_3rdO %>%
+  group_by(storm, plan, STA, river) %>%
+  mutate(
+    ti_min = case_when(wettedFPw >= 15 ~ 15)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(
+    FP_width = 
+           case_when(
+             river == "1-7" ~ 16.5,
+             river == "2-2" ~ 34.5,
+             plan == "unr" & river == "3-1" ~ 67.5, 
+             plan == "3rd-20p" & river == "3-1" & STA >= 134600 ~ 75,
+             plan == "3rd-20p" & river == "3-1" & STA < 134600 ~ 67.5,
+             plan == "3rd-40p" & river == "3-1" & STA >= 126200 ~ 75,
+             plan == "3rd-40p" & river == "3-1" & STA < 126200 ~ 67.5,
+             plan == "3rd-60p" & river == "3-1" & STA >= 117800 ~ 75,
+             plan == "3rd-60p" & river == "3-1" & STA < 117800 ~ 67.5,
+             plan == "3rd-80p" & river == "3-1" & STA >= 109400 ~ 75,
+             plan == "3rd-80p" & river == "3-1" & STA < 109400 ~ 67.5,
+             plan == "3rd-100p" & river == "3-1" ~ 75,
+             river == "4-1" ~ 126)) %>% 
+  mutate(
+    k10_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                    ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                    ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+                          
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                    ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+          
+                river == "4-1" & (STA < 101000)
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000)) %>% 
+   mutate(
+    km_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+                            
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+                          
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "4-1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000)) %>% 
+  mutate(
+    k90_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+                            
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+                          
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "4-1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000)) %>% 
+  group_by(storm, plan, river) %>%
+  summarise(removal_k10_g = sum(k10_removal_g),
+            removal_km_g = sum(km_removal_g),
+            removal_k90_g = sum(k90_removal_g)) %>%
+  mutate(removal_k10_g = case_when(river == "1-7" ~ removal_k10_g*24, 
+                                 river == "2-2" ~ removal_k10_g*6,
+                                 river == "3-1" ~ removal_k10_g*2,
+                                 river == "4-1" ~ removal_k10_g),
+         removal_km_g = case_when(river == "1-7" ~ removal_km_g*24, 
+                                 river == "2-2" ~ removal_km_g*6,
+                                 river == "3-1" ~ removal_km_g*2,
+                                 river == "4-1" ~ removal_km_g),
+         removal_k90_g = case_when(river == "1-7" ~ removal_k90_g*24, 
+                                 river == "2-2" ~ removal_k90_g*6,
+                                 river == "3-1" ~ removal_k90_g*2,
+                                 river == "4-1" ~ removal_k90_g)) %>%
+  mutate(order = 
+           case_when(            river == "1-7" ~ "1st", 
+                                 river == "2-2" ~ "2nd",
+                                 river == "3-1" ~ "3rd",
+                                 river == "4-1" ~ "4th")) %>% 
+  mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
+                                 endsWith(plan, "80p")~ 80,
+                                 endsWith(plan, "60p")~ 60,
+                                 endsWith(plan, "40p")~ 40,
+                                 endsWith(plan, "20p")~ 20,
+                                 endsWith(plan, "unr")~ 0)) %>%
+  mutate(k10_percentWLR = case_when(storm == "Q2" ~
+                                   (removal_k10_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k10_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k10_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k10_g/Qm_watershed_load)*100),
+         km_percentWLR = case_when(storm == "Q2" ~
+                                   (removal_km_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_km_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_km_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_km_g/Qm_watershed_load)*100),
+         k90_percentWLR = case_when(storm == "Q2" ~
+                                   (removal_k90_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k90_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k90_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k90_g/Qm_watershed_load)*100)) %>%
+  mutate(k10_percentOLR = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k10_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k10_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k10_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k10_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k10_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k10_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k10_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k10_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k10_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k10_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k10_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k10_g/Qm_load4)*100),
+         km_percentOLR = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_km_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_km_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_km_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_km_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_km_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_km_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_km_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_km_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_km_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_km_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_km_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_km_g/Qm_load4)*100),
+         k90_percentOLR = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k90_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k90_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k90_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k90_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k90_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k90_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k90_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k90_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k90_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k90_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k90_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k90_g/Qm_load4)*100))
+
+#Nitrate loads for 2mg/L source concentration(g)
+Q2_watershed_load <- 9126217 #total NO3 load to the watershed (grams)
+Q2_load1 <- 283805 #input load to a all first order streams (grams)
+Q2_load2 <- 241163 #input load to a all second order streams (grams)
+Q2_load3 <- 1360864 #input load to a all third order streams (grams)
+Q2_load4 <- 7240386 #input load to the fourth order stream (grams)
+
+Q1_watershed_load <- 7306722 #total NO3 load to the watershed (grams)
+Q1_load1 <- 205948 #input load to a all first order streams (grams)
+Q1_load2 <- 252249 #input load to a all second order streams (grams)
+Q1_load3 <- 1091643 #input load to a all third order streams (grams)
+Q1_load4 <- 5756881 #input load to the fourth order stream (grams)
+
+Q0.5_watershed_load <- 4525219 #total NO3 load to the watershed (grams)
+Q0.5_load1 <- 183030 #input load to a all first order streams (grams)
+Q0.5_load2 <- 149078 #input load to a all second order streams (grams)
+Q0.5_load3 <- 651608 #input load to a all third order streams (grams)
+Q0.5_load4 <- 3541503 #input load to the fourth order stream (grams)
+
+Qm_watershed_load <- 490322 #total NO3 load to the watershed (grams)
+Qm_load1 <- 131760 #input load to a all first order streams (grams)
+Qm_load2 <- 6005 #input load to a all second order streams (grams)
+Qm_load3 <- 53730 #input load to a all third order streams (grams)
+Qm_load4 <- 298827 #input load to the fourth order stream (grams)
+
+NO3_3rdO <- NO3_3rdO %>%
+   mutate(k10_pWLR_2mgL = case_when(storm == "Q2" ~
+                                   (removal_k10_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k10_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k10_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k10_g/Qm_watershed_load)*100),
+         km_pWLR_2mgL = case_when(storm == "Q2" ~
+                                   (removal_km_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_km_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_km_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_km_g/Qm_watershed_load)*100),
+         k90_pWLR_2mgL = case_when(storm == "Q2" ~
+                                   (removal_k90_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k90_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k90_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k90_g/Qm_watershed_load)*100)) %>%
+  mutate(k10_pOLR_2mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k10_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k10_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k10_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k10_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k10_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k10_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k10_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k10_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k10_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k10_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k10_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k10_g/Qm_load4)*100),
+         km_pOLR_2mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_km_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_km_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_km_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_km_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_km_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_km_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_km_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_km_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_km_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_km_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_km_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_km_g/Qm_load4)*100),
+         k90_pOLR_2mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k90_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k90_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k90_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k90_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k90_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k90_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k90_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k90_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k90_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k90_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k90_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k90_g/Qm_load4)*100))
+
+#Nitrate loads for 0.5mg/L source concentration(g)
+Q2_watershed_load <- 2281554 #total NO3 load to the watershed (grams)
+Q2_load1 <- 70951 #input load to a all first order streams (grams)
+Q2_load2 <- 60291 #input load to a all second order streams (grams)
+Q2_load3 <- 340216 #input load to a all third order streams (grams)
+Q2_load4 <- 1810096 #input load to the fourth order stream (grams)
+
+Q1_watershed_load <- 1826680 #total NO3 load to the watershed (grams)
+Q1_load1 <- 51487 #input load to a all first order streams (grams)
+Q1_load2 <- 63062 #input load to a all second order streams (grams)
+Q1_load3 <- 272911 #input load to a all third order streams (grams)
+Q1_load4 <- 1439220 #input load to the fourth order stream (grams)
+
+Q0.5_watershed_load <- 1131305 #total NO3 load to the watershed (grams)
+Q0.5_load1 <- 45757 #input load to a all first order streams (grams)
+Q0.5_load2 <- 37270 #input load to a all second order streams (grams)
+Q0.5_load3 <- 162902 #input load to a all third order streams (grams)
+Q0.5_load4 <- 885376 #input load to the fourth order stream (grams)
+
+Qm_watershed_load <- 122581 #total NO3 load to the watershed (grams)
+Qm_load1 <- 32940 #input load to a all first order streams (grams)
+Qm_load2 <- 1501 #input load to a all second order streams (grams)
+Qm_load3 <- 13432 #input load to a all third order streams (grams)
+Qm_load4 <- 74707 #input load to the fourth order stream (grams)
+
+NO3_3rdO <- NO3_3rdO %>%
+   mutate(k10_pWLR_.5mgL = case_when(storm == "Q2" ~
+                                   (removal_k10_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k10_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k10_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k10_g/Qm_watershed_load)*100),
+         km_pWLR_.5mgL = case_when(storm == "Q2" ~
+                                   (removal_km_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_km_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_km_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_km_g/Qm_watershed_load)*100),
+         k90_pWLR_.5mgL = case_when(storm == "Q2" ~
+                                   (removal_k90_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k90_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k90_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k90_g/Qm_watershed_load)*100)) %>%
+  mutate(k10_pOLR_.5mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k10_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k10_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k10_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k10_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k10_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k10_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k10_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k10_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k10_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k10_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k10_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k10_g/Qm_load4)*100),
+         km_pOLR_.5mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_km_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_km_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_km_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_km_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_km_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_km_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_km_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_km_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_km_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_km_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_km_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_km_g/Qm_load4)*100),
+         k90_pOLR_.5mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k90_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k90_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k90_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k90_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k90_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k90_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k90_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k90_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k90_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k90_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k90_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k90_g/Qm_load4)*100))
+  # mutate_if(is.numeric, # Using dplyr functions
+  #           round,
+  #           digits = 2)
+```
+
+#%NO3 Removal by 4th Order River Restoration. Produces load removals in the entire order.
+```{r}
+#Nitrate loads for 1mg/L source concentration(g)
+Q2_watershed_load <- 4563108 #total NO3 load to the watershed (grams)
+Q2_load1 <- 141902 #input load to a all first order streams (grams)
+Q2_load2 <- 120581 #input load to a all second order streams (grams)
+Q2_load3 <- 680432 #input load to a all third order streams (grams)
+Q2_load4 <- 3620193 #input load to the fourth order stream (grams)
+
+Q1_watershed_load <- 3653361 #total NO3 load to the watershed (grams)
+Q1_load1 <- 102974 #input load to a all first order streams (grams)
+Q1_load2 <- 126125 #input load to a all second order streams (grams)
+Q1_load3 <- 545822 #input load to a all third order streams (grams)
+Q1_load4 <- 2878440 #input load to the fourth order stream (grams)
+
+Q0.5_watershed_load <- 2262609 #total NO3 load to the watershed (grams)
+Q0.5_load1 <- 91515 #input load to a all first order streams (grams)
+Q0.5_load2 <- 74539 #input load to a all second order streams (grams)
+Q0.5_load3 <- 325804 #input load to a all third order streams (grams)
+Q0.5_load4 <- 1770751 #input load to the fourth order stream (grams)
+
+Qm_watershed_load <- 245161 #total NO3 load to the watershed (grams)
+Qm_load1 <- 65880 #input load to a all first order streams (grams)
+Qm_load2 <- 3003 #input load to a all second order streams (grams)
+Qm_load3 <- 26865 #input load to a all third order streams (grams)
+Qm_load4 <- 149414 #input load to the fourth order stream (grams)
+
+#WLR= watershed load removed; OLR= order load removed
+NO3_4thO <- RAS_4thO %>%
+  group_by(storm, plan, STA, river) %>%
+  mutate(
+    ti_min = case_when(wettedFPw >= 15 ~ 15)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(
+    FP_width = 
+           case_when(
+             river == "1-7" ~ 16.5, 
+             river == "2-2" ~ 34.5,
+             river == "3-1" ~ 67.5,
+             plan == "unr" & river == "4-1" ~ 126, 
+             plan == "4th-20p" & river == "4-1" & STA >= 80800 ~ 130,
+             plan == "4th-20p" & river == "4-1" & STA < 80800 ~ 126,
+             plan == "4th-40p" & river == "4-1" & STA >= 60600 ~ 130,
+             plan == "4th-40p" & river == "4-1" & STA < 60600 ~ 126,
+             plan == "4th-60p" & river == "4-1" & STA >= 40400 ~ 130,
+             plan == "4th-60p" & river == "4-1" & STA < 40400 ~ 126,
+             plan == "4th-80p" & river == "4-1" & STA >= 20200 ~ 130,
+             plan == "4th-80p" & river == "4-1" & STA < 20200 ~ 126,
+             plan == "4th-100p" & river == "4-1" ~ 130)) %>% 
+  mutate( 
+    k10_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                    ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                    ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+                          
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                    ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+          
+                river == "4-1" & (STA < 101000)
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000)) %>% 
+   mutate(
+    km_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+                            
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000,
+                          
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000, 
+                river == "4-1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*km/1000)) %>% 
+  mutate(
+    k90_removal_g = 
+      case_when(river == "1-7" & STA %in% c(165500,159500) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "1-7" & STA < 165500 & STA > 159500 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+                            
+                river == "2-2" & STA %in% c(159500, 154000, 148500, 143000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "2-2" & (STA < 159500 & STA > 154000) | 
+                                 (STA < 154000 & STA > 148500) | 
+                                 (STA < 148500 & STA > 143000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+
+                river == "3-1" & STA %in% c(143000, 122000, 101000) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "3-1" & (STA < 143000 & STA > 122000) | 
+                                 (STA < 122000 & STA > 101000) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000,
+                          
+                river == "4-1" & STA %in% c(101000, 0) 
+                                      ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k90/1000, 
+                river == "4-1" & (STA < 101000 & STA > 0) 
+                                      ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k90/1000)) %>% 
+  group_by(storm, plan, river) %>%
+  summarise(removal_k10_g = sum(k10_removal_g),
+            removal_km_g = sum(km_removal_g),
+            removal_k90_g = sum(k90_removal_g)) %>%
+  mutate(removal_k10_g = case_when(river == "1-7" ~ removal_k10_g*24, 
+                                 river == "2-2" ~ removal_k10_g*6,
+                                 river == "3-1" ~ removal_k10_g*2,
+                                 river == "4-1" ~ removal_k10_g),
+         removal_km_g = case_when(river == "1-7" ~ removal_km_g*24, 
+                                 river == "2-2" ~ removal_km_g*6,
+                                 river == "3-1" ~ removal_km_g*2,
+                                 river == "4-1" ~ removal_km_g),
+         removal_k90_g = case_when(river == "1-7" ~ removal_k90_g*24, 
+                                 river == "2-2" ~ removal_k90_g*6,
+                                 river == "3-1" ~ removal_k90_g*2,
+                                 river == "4-1" ~ removal_k90_g)) %>%
+  mutate(order = 
+           case_when(            river == "1-7" ~ "1st", 
+                                 river == "2-2" ~ "2nd",
+                                 river == "3-1" ~ "3rd",
+                                 river == "4-1" ~ "4th")) %>% 
+  mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
+                                 endsWith(plan, "80p")~ 80,
+                                 endsWith(plan, "60p")~ 60,
+                                 endsWith(plan, "40p")~ 40,
+                                 endsWith(plan, "20p")~ 20,
+                                 endsWith(plan, "unr")~ 0)) %>%
+  mutate(k10_percentWLR = case_when(storm == "Q2" ~
+                                   (removal_k10_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k10_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k10_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k10_g/Qm_watershed_load)*100),
+         km_percentWLR = case_when(storm == "Q2" ~
+                                   (removal_km_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_km_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_km_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_km_g/Qm_watershed_load)*100),
+         k90_percentWLR = case_when(storm == "Q2" ~
+                                   (removal_k90_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k90_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k90_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k90_g/Qm_watershed_load)*100)) %>%
+  mutate(k10_percentOLR = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k10_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k10_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k10_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k10_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k10_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k10_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k10_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k10_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k10_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k10_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k10_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k10_g/Qm_load4)*100),
+         km_percentOLR = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_km_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_km_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_km_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_km_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_km_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_km_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_km_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_km_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_km_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_km_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_km_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_km_g/Qm_load4)*100),
+         k90_percentOLR = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k90_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k90_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k90_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k90_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k90_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k90_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k90_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k90_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k90_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k90_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k90_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k90_g/Qm_load4)*100))
+
+#Nitrate loads for 2mg/L source concentration(g)
+Q2_watershed_load <- 9126217 #total NO3 load to the watershed (grams)
+Q2_load1 <- 283805 #input load to a all first order streams (grams)
+Q2_load2 <- 241163 #input load to a all second order streams (grams)
+Q2_load3 <- 1360864 #input load to a all third order streams (grams)
+Q2_load4 <- 7240386 #input load to the fourth order stream (grams)
+
+Q1_watershed_load <- 7306722 #total NO3 load to the watershed (grams)
+Q1_load1 <- 205948 #input load to a all first order streams (grams)
+Q1_load2 <- 252249 #input load to a all second order streams (grams)
+Q1_load3 <- 1091643 #input load to a all third order streams (grams)
+Q1_load4 <- 5756881 #input load to the fourth order stream (grams)
+
+Q0.5_watershed_load <- 4525219 #total NO3 load to the watershed (grams)
+Q0.5_load1 <- 183030 #input load to a all first order streams (grams)
+Q0.5_load2 <- 149078 #input load to a all second order streams (grams)
+Q0.5_load3 <- 651608 #input load to a all third order streams (grams)
+Q0.5_load4 <- 3541503 #input load to the fourth order stream (grams)
+
+Qm_watershed_load <- 490322 #total NO3 load to the watershed (grams)
+Qm_load1 <- 131760 #input load to a all first order streams (grams)
+Qm_load2 <- 6005 #input load to a all second order streams (grams)
+Qm_load3 <- 53730 #input load to a all third order streams (grams)
+Qm_load4 <- 298827 #input load to the fourth order stream (grams)
+
+NO3_4thO <- NO3_4thO %>%
+   mutate(k10_pWLR_2mgL = case_when(storm == "Q2" ~
+                                   (removal_k10_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k10_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k10_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k10_g/Qm_watershed_load)*100),
+         km_pWLR_2mgL = case_when(storm == "Q2" ~
+                                   (removal_km_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_km_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_km_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_km_g/Qm_watershed_load)*100),
+         k90_pWLR_2mgL = case_when(storm == "Q2" ~
+                                   (removal_k90_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k90_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k90_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k90_g/Qm_watershed_load)*100)) %>%
+  mutate(k10_pOLR_2mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k10_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k10_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k10_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k10_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k10_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k10_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k10_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k10_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k10_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k10_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k10_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k10_g/Qm_load4)*100),
+         km_pOLR_2mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_km_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_km_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_km_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_km_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_km_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_km_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_km_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_km_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_km_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_km_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_km_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_km_g/Qm_load4)*100),
+         k90_pOLR_2mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k90_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k90_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k90_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k90_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k90_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k90_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k90_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k90_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k90_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k90_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k90_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k90_g/Qm_load4)*100))
+
+#Nitrate loads for 0.5mg/L source concentration(g)
+Q2_watershed_load <- 2281554 #total NO3 load to the watershed (grams)
+Q2_load1 <- 70951 #input load to a all first order streams (grams)
+Q2_load2 <- 60291 #input load to a all second order streams (grams)
+Q2_load3 <- 340216 #input load to a all third order streams (grams)
+Q2_load4 <- 1810096 #input load to the fourth order stream (grams)
+
+Q1_watershed_load <- 1826680 #total NO3 load to the watershed (grams)
+Q1_load1 <- 51487 #input load to a all first order streams (grams)
+Q1_load2 <- 63062 #input load to a all second order streams (grams)
+Q1_load3 <- 272911 #input load to a all third order streams (grams)
+Q1_load4 <- 1439220 #input load to the fourth order stream (grams)
+
+Q0.5_watershed_load <- 1131305 #total NO3 load to the watershed (grams)
+Q0.5_load1 <- 45757 #input load to a all first order streams (grams)
+Q0.5_load2 <- 37270 #input load to a all second order streams (grams)
+Q0.5_load3 <- 162902 #input load to a all third order streams (grams)
+Q0.5_load4 <- 885376 #input load to the fourth order stream (grams)
+
+Qm_watershed_load <- 122581 #total NO3 load to the watershed (grams)
+Qm_load1 <- 32940 #input load to a all first order streams (grams)
+Qm_load2 <- 1501 #input load to a all second order streams (grams)
+Qm_load3 <- 13432 #input load to a all third order streams (grams)
+Qm_load4 <- 74707 #input load to the fourth order stream (grams)
+
+NO3_4thO <- NO3_4thO %>%
+   mutate(k10_pWLR_.5mgL = case_when(storm == "Q2" ~
+                                   (removal_k10_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k10_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k10_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k10_g/Qm_watershed_load)*100),
+         km_pWLR_.5mgL = case_when(storm == "Q2" ~
+                                   (removal_km_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_km_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_km_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_km_g/Qm_watershed_load)*100),
+         k90_pWLR_.5mgL = case_when(storm == "Q2" ~
+                                   (removal_k90_g/Q2_watershed_load)*100,
+                                   storm == "Q1" ~
+                                   (removal_k90_g/Q1_watershed_load)*100,
+                                   storm == "Q0.5" ~
+                                   (removal_k90_g/Q0.5_watershed_load)*100,
+                                   storm == "Qm" ~
+                                   (removal_k90_g/Qm_watershed_load)*100)) %>%
+  mutate(k10_pOLR_.5mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k10_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k10_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k10_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k10_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k10_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k10_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k10_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k10_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k10_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k10_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k10_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k10_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k10_g/Qm_load4)*100),
+         km_pOLR_.5mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_km_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_km_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_km_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_km_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_km_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_km_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_km_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_km_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_km_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_km_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_km_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_km_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_km_g/Qm_load4)*100),
+         k90_pOLR_.5mgL = 
+           case_when(river == "1-7" & storm == "Q2" ~ (removal_k90_g/Q2_load1)*100,
+                     river == "1-7" & storm == "Q1" ~ (removal_k90_g/Q1_load1)*100,
+                     river == "1-7" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load1)*100,
+                     river == "1-7" & storm == "Qm" ~ (removal_k90_g/Qm_load1)*100,
+                     river == "2-2" & storm == "Q2" ~ (removal_k90_g/Q2_load2)*100,
+                     river == "2-2" & storm == "Q1" ~ (removal_k90_g/Q1_load2)*100,
+                     river == "2-2" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load2)*100,
+                     river == "2-2" & storm == "Qm" ~ (removal_k90_g/Qm_load2)*100,
+                     river == "3-1" & storm == "Q2" ~ (removal_k90_g/Q2_load3)*100,
+                     river == "3-1" & storm == "Q1" ~ (removal_k90_g/Q1_load3)*100,
+                     river == "3-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load3)*100,
+                     river == "3-1" & storm == "Qm" ~ (removal_k90_g/Qm_load3)*100,
+                     river == "4-1" & storm == "Q2" ~ (removal_k90_g/Q2_load4)*100,
+                     river == "4-1" & storm == "Q1" ~ (removal_k90_g/Q1_load4)*100,
+                     river == "4-1" & storm == "Q0.5" ~ (removal_k90_g/Q0.5_load4)*100,
+                     river == "4-1" & storm == "Qm" ~ (removal_k90_g/Qm_load4)*100))
+#Rounding:
+  # mutate_if(is.numeric, # Using dplyr functions
+  #           round,
+  #           digits = 2)
+
+```
+
+#Scrapped code:
+##Preparing data for plotting... dont use this anymore just keep in one DF
+```{r}
+Plot_Q2_1stO <- NO3_1stO %>%
+#Plot_Q1_1stO <- NO3_Q1_1stO %>%
+#Plot_Q0.5_1stO <- NO3_Q0.5_1stO %>%
+  
+#Plot_Qm_1stO_i <- NO3_Qm_1stO %>%
+  mutate(k10_tot_removal = case_when(river == "1_7" ~ k10_removal_g*24, 
+                                 river == "2_2" ~ k10_removal_g*6,
+                                 river == "3_1" ~ k10_removal_g*2,
+                                 river == "4_1" ~ k10_removal_g),
+         km_tot_removal = case_when(river == "1_7" ~ km_removal_g*24, 
+                                 river == "2_2" ~ km_removal_g*6,
+                                 river == "3_1" ~ km_removal_g*2,
+                                 river == "4_1" ~ km_removal_g),
+         k90_tot_removal = case_when(river == "1_7" ~ k90_removal_g*24, 
+                                 river == "2_2" ~ k90_removal_g*6,
+                                 river == "3_1" ~ k90_removal_g*2,
+                                 river == "4_1" ~ k90_removal_g)) 
+
+Plot_Qm_1stO <- NO3_Qm_1stO %>%
+  mutate(k10_tot_removal = case_when(river == "1-7" ~ k10_removal_g*24, 
+                                 river == "2-2" ~ k10_removal_g*6,
+                                 river == "3-1" ~ k10_removal_g*2,
+                                 river == "4-1" ~ k10_removal_g),
+         km_tot_removal = case_when(river == "1-7" ~ km_removal_g*24, 
+                                 river == "2-2" ~ km_removal_g*6,
+                                 river == "3-1" ~ km_removal_g*2,
+                                 river == "4-1" ~ km_removal_g),
+         k90_tot_removal = case_when(river == "1-7" ~ k90_removal_g*24, 
+                                 river == "2-2" ~ k90_removal_g*6,
+                                 river == "3-1" ~ k90_removal_g*2,
+                                 river == "4-1" ~ k90_removal_g)) %>%
+  ungroup()%>%
+  group_by(plan, river) %>%
+  summarise(k10_tot_Removed_g = sum(k10_tot_removal),
+            km_tot_Removed_g = sum(km_tot_removal),
+            k90_tot_Removed_g = sum(k90_tot_removal)) %>% 
+  mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
+                                 endsWith(plan, "80p")~ 80,
+                                 endsWith(plan, "60p")~ 60,
+                                 endsWith(plan, "40p")~ 40,
+                                 endsWith(plan, "20p")~ 20,
+                                 endsWith(plan, "unr")~ 0)) %>%
+  mutate(storm = "Q2") %>%
+  #mutate(storm = "Q1") %>%
+  #mutate(storm = "Q0.5") %>%
+  #mutate(storm = "Qm") %>%
+  mutate(#k10percentRemoved = (k10_tot_Removed_g/watershed_load)*100,
+         kmpercentRemoved = case_when(river == "1_7" ~ (km_tot_Removed_g/watershed_load)*100,
+                                      river == "2_2" ~ (km_tot_Removed_g/watershed_load)*100,
+                                      river == "3_1" ~ (km_tot_Removed_g/watershed_load)*100,
+                                      river == "4_1" ~ (km_tot_Removed_g/watershed_load)*100))
+         #k90percentRemoved = (k90_tot_Removed_g/watershed_load)*100)
+
+Plot_1stO_i <- rbind(Plot_Q2_1stO, Plot_Q1_1stO, Plot_Q0.5_1stO, Plot_Qm_1stO_i)
+#write.csv(Plot_1stO, file = "Exports/Plot_1stO.csv")
+#rm(Plot_Q2_1stO,Plot_Q1_1stO,Plot_Q0.5_1stO,Plot_Qm_1stO_i)
+
+
+Plot_1stO_i %>% 
+  filter(river == "4_1")%>%
+  ggplot() +
+  geom_line(aes(x = percentRest, y = kmpercentRemoved, color = storm))+
+  geom_point(aes(x = percentRest, y = kmpercentRemoved, color = storm))+
+  xlab("% of 1st-order Streams Restored")+
+  ylab("%NO3 Removed from Watershed")+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ggtitle("NO3 Removal by  1st-order River restoration (median k)")
+
+Plot_1stO %>% 
+  ggplot() +
+  geom_line(aes(x = percentRest, y = k90percentRemoved, color = storm))+
+  geom_point(aes(x = percentRest, y = k90percentRemoved, color = storm))+
+  xlab("% of 1st-order Streams Restored")+
+  ylab("%NO3 Removed from Watershed")+
+  #scale_y_log10()+
+  scale_x_continuous(breaks=seq(0,100,by=20))
+  
+
+#if need to check what variables are grouped:
+#group_keys(NO3_1stO)
+```
+
+
+#Trials: Reding in textfiles
+```{r}
+#read_table states parsing failures but then no problems when call problems on it.Parsing error is at blank rows in between XS and when values are pressent in wettedFPw. column count not as expected.
+test1 <- read_table("TextFiles/1-7_Q1_1st-60p.txt", skip = 12, skip_empty_rows = TRUE, col_names = c("reach", "STA", "day", "time", "wettedFPw"), col_types = cols(reach = "c", STA = "c", day = "c", time = "c", wettedFPw = "n")) %>% 
+  mutate(river = "1-7", storm = "Q1", plan = "1st-60p")  %>%
+  drop_na(STA)%>%
+  mutate(STA = 
+           case_when(
+             endsWith(STA, ".*") ~ substr(STA, 1, nchar(STA)-2),
+             endsWith(STA, ".0*") ~ substr(STA, 1, nchar(STA)-3),
+             endsWith(STA, ".00*") ~ substr(STA, 1, nchar(STA)-4),
+             TRUE ~ STA))%>% 
+  filter(wettedFPw > 15, na.rm = TRUE)
+
+prob <- problems(test1)
+
+#fwf_widths could run into issues if the textfiles arent all the exact same
+test2 <- read_fwf("TextFiles/1-7_Q1_1st-60p.txt", skip = 12, fwf_widths(c(10,20,15, 4, 9), col_names = c("reach", "STA", "day", "time", "wettedFPw")), col_types = cols(reach = "c", STA = "c", day = "c", time = "c", wettedFPw = "n"))%>%
+  mutate(river = "1-7", storm = "Q1", plan = "1st-60p")  %>%
+  drop_na(STA)%>%
+  mutate(STA = 
+           case_when(
+             endsWith(STA, ".*") ~ substr(STA, 1, nchar(STA)-2),
+             endsWith(STA, ".0*") ~ substr(STA, 1, nchar(STA)-3),
+             endsWith(STA, ".00*") ~ substr(STA, 1, nchar(STA)-4),
+             TRUE ~ STA))
+
+test2$STA <- as.numeric(test2$STA)
+
+test3 <- read_fwf("TextFiles/1-7_Q1_1st-60p.txt", skip = 12, fwf_empty("TextFiles/1-7_Q1_1st-60p.txt", col_names = c("reach", "STA", "day", "time", "wettedFPw")), col_types = cols(reach = "c", STA = "c", day = "c", time = "c", wettedFPw = "n"))
+
+
+# origional read data using loop
+DF <- NULL
+for (f in raw.file.paths$filepath) {
+   dat <- read_table(f, skip = 12, col_names = c("reach", "STA", "day", "time", "wettedFPw")) %>%
+     mutate(plan = f)
+   DF <- rbind(DF, dat)
+}
+```
+
+#Data by csv: 1st-order restoration, preparing data frames
+```{r}
+#read in Q2 data for 1st order restoration. Locale argument is to fix error recieved for using a local file.
+Q2_unr <- read_csv("1stOdata/Q2_unr.csv")
+Q2_1st_20p <- read_csv("1stOdata/Q2_1st-20p.csv", locale=locale(encoding="latin1"))
+Q2_1st_40p <- read_csv("1stOdata/Q2_1st-40p.csv", locale=locale(encoding="latin1"))
+Q2_1st_60p <- read_csv("1stOdata/Q2_1st-60p.csv", locale=locale(encoding="latin1"))
+Q2_1st_80p <- read_csv("1stOdata/Q2_1st-80p.csv", locale=locale(encoding="latin1"))
+Q2_1st_100p <- read_csv("1stOdata/Q2_1st-100p.csv", locale=locale(encoding="latin1"))
+
+#R is changing the first colum name for these files--dont know why.
+colnames(Q2_1st_20p)[1] <- "storm"
+colnames(Q2_1st_40p)[1] <- "storm"
+colnames(Q2_1st_60p)[1] <- "storm"
+colnames(Q2_1st_80p)[1] <- "storm"
+colnames(Q2_1st_100p)[1] <- "storm"
+
+#read in Q1 data for 1st order restoration. Locale argument is to fix error recieved for using a local file.
+Q1_unr <- read_csv("1stOdata/Q1_unr.csv")
+Q1_1st_20p <- read_csv("1stOdata/Q1_1st-20p.csv", locale=locale(encoding="latin1"))
+Q1_1st_40p <- read_csv("1stOdata/Q1_1st-40p.csv", locale=locale(encoding="latin1"))
+Q1_1st_60p <- read_csv("1stOdata/Q1_1st-60p.csv", locale=locale(encoding="latin1"))
+Q1_1st_80p <- read_csv("1stOdata/Q1_1st-80p.csv", locale=locale(encoding="latin1"))
+Q1_1st_100p <- read_csv("1stOdata/Q1_1st-100p.csv", locale=locale(encoding="latin1"))
+
+#read in Q0.5 data for 1st order restoration. Locale argument is to fix error recieved for using a local file.
+Q0.5_unr <- read_csv("1stOdata/Q0.5_unr.csv")
+Q0.5_1st_20p <- read_csv("1stOdata/Q0.5_1st-20p.csv", locale=locale(encoding="latin1"))
+Q0.5_1st_40p <- read_csv("1stOdata/Q0.5_1st-40p.csv", locale=locale(encoding="latin1"))
+Q0.5_1st_60p <- read_csv("1stOdata/Q0.5_1st-60p.csv", locale=locale(encoding="latin1"))
+Q0.5_1st_80p <- read_csv("1stOdata/Q0.5_1st-80p.csv", locale=locale(encoding="latin1"))
+Q0.5_1st_100p <- read_csv("1stOdata/Q0.5_1st-100p.csv", locale=locale(encoding="latin1"))
+
+#read in Qmonth data for 1st order restoration. Locale argument is to fix error recieved for using a local file.
+Qm_unr <- read_csv("1stOdata/Qm_unr.csv")
+Qm_1st_20p <- read_csv("1stOdata/Qm_1st-20p.csv", locale=locale(encoding="latin1"))
+Qm_1st_40p <- read_csv("1stOdata/Qm_1st-40p.csv", locale=locale(encoding="latin1"))
+Qm_1st_60p <- read_csv("1stOdata/Qm_1st-60p.csv", locale=locale(encoding="latin1"), col_types = cols(storm = "c", plan = "c", river = "c", reach = "n", STA = "n", day = "c", hr = "n", min = "n", wettedFPw = "n"))
+Qm_1st_80p <- read_csv("1stOdata/Qm_1st-80p.csv", locale=locale(encoding="latin1"), col_types = cols(storm = "c", plan = "c", river = "c", reach = "n", STA = "n", day = "c", hr = "n", min = "n", wettedFPw = "n"))
+Qm_1st_100p <- read_csv("1stOdata/Qm_1st-100p.csv", locale=locale(encoding="latin1"), col_types = cols(storm = "c", plan = "c", river = "c", reach = "n", STA = "n", day = "c", hr = "n", min = "n", wettedFPw = "n"))
+
+#combine to single data frame
+Q2_1stO <- rbind(Q2_unr, 
+                 Q2_1st_20p, 
+                 Q2_1st_40p, 
+                 Q2_1st_60p, 
+                 Q2_1st_80p, 
+                 Q2_1st_100p)%>%
+  drop_na(STA)
+#need to make space in project. R does not have infinite storage and files are too much.
+rm(Q2_unr, Q2_1st_20p, Q2_1st_40p, Q2_1st_60p, Q2_1st_80p, Q2_1st_100p)
+  
+Q1_1stO <- rbind(Q1_unr,
+                 Q1_1st_20p, 
+                 Q1_1st_40p, 
+                 Q1_1st_60p, 
+                 Q1_1st_80p,
+                 Q1_1st_100p)%>%
+  drop_na(STA)
+rm(Q1_unr,Q1_1st_20p,Q1_1st_40p,Q1_1st_60p, Q1_1st_80p, Q1_1st_100p)
+  
+Q0.5_1stO <- rbind(Q0.5_unr, 
+                   Q0.5_1st_20p,
+                   Q0.5_1st_40p, 
+                   Q0.5_1st_60p, 
+                   Q0.5_1st_80p, 
+                   Q0.5_1st_100p) %>%
+  drop_na(STA)
+rm(Q0.5_unr, Q0.5_1st_20p,Q0.5_1st_40p, Q0.5_1st_60p,Q0.5_1st_80p,Q0.5_1st_100p)
+
+Qm_1stO <- rbind(Qm_unr, 
+                   Qm_1st_20p,
+                   Qm_1st_40p, 
+                   Qm_1st_60p, 
+                   Qm_1st_80p, 
+                   Qm_1st_100p) %>%
+  drop_na(STA)
+rm(Qm_unr, Qm_1st_20p, Qm_1st_40p, Qm_1st_60p, Qm_1st_80p, Qm_1st_100p)
+
+Q1stO <- bind_rows(Q2_1stO, Q1_1stO, Q0.5_1stO, Qm_1stO)
+rm(Q2_1stO, Q1_1stO, Q0.5_1stO, Qm_1stO)
+```
+
