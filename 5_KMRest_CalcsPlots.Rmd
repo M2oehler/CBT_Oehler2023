@@ -509,17 +509,16 @@ NO3_km$Restoration_Location <- factor(NO3_km$Restoration_Location,              
             
 ```
 
-```{r}
+```{r plot-wider, fig.width=12, fig.height=4}
 plot_Kmkm <- NO3_km %>%
   group_by(storm,plan, RestPathLoc_Km, Restoration_Location)%>%
   summarise(km_percentWLR = sum(km_percentWLR))%>%
   ggplot()+
   geom_line((aes(RestPathLoc_Km, km_percentWLR, color = storm, group = storm)))+
   geom_point(aes(RestPathLoc_Km, km_percentWLR,color = storm, shape = Restoration_Location))+
-  xlab("Location of 1km restoration \n along the flowpath (km)")+
-  ylab("Percent of Total Watershed Load Removed")+
-  ggtitle("km")+
-  theme(aspect.ratio = 1)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  ggtitle(expression("k"[m]))+
   theme(legend.spacing.y = unit(0.2, 'cm'))
 
 plot_Kmk90 <- NO3_km %>%
@@ -528,10 +527,9 @@ plot_Kmk90 <- NO3_km %>%
   ggplot()+
   geom_line(aes(RestPathLoc_Km, k90_percentWLR, color = storm, group = storm))+
   geom_point(aes(RestPathLoc_Km, k90_percentWLR, color = storm, shape = Restoration_Location))+
-  xlab("Location of 1km restoration \n along the flowpath (km)")+
-  ylab("Percent of Total Watershed Load Removed")+
-  ggtitle("k90")+
-  theme(aspect.ratio = 1)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  ggtitle(expression("k"[90]))+
   theme(legend.spacing.y = unit(0.2, 'cm'))
 
 plot_Kmk10 <- NO3_km %>%
@@ -540,25 +538,25 @@ plot_Kmk10 <- NO3_km %>%
   ggplot()+
   geom_line(aes(RestPathLoc_Km, k10_percentWLR, color = storm, group = storm))+
   geom_point(aes(RestPathLoc_Km, k10_percentWLR, color = storm, shape = Restoration_Location))+
-  xlab("Location of 1km restoration \n along the flowpath (km)")+
+  xlab(element_blank())+
   ylab("Percent of Total Watershed Load Removed")+
-  ggtitle("k10")+
-  theme(aspect.ratio = 1)+
+  ggtitle(expression("k"[10]))+
   theme(legend.spacing.y = unit(0.2, 'cm'))
 
 plot_Kmk10 + theme(text = element_text(size = 7)) + plot_Kmkm + theme(text = element_text(size = 7)) +
   plot_Kmk90 + theme(text = element_text(size = 7)) +
   plot_layout(ncol = 3, guides = "collect")+
-            plot_annotation(title = 'Watershed NO3 Removal due to 1km Restoration',
-                            #caption = 'Total flow path length from river 1-7 to 4-1 outlet = 50.4 Km',
-                            theme = theme(title = element_text(size = 8, face = 2))) 
+            plot_annotation(title = expression("Percent Watershed NO"[3]*" Removed with 1 km Length Restoration Implemented"),
+                            caption = expression("Location of 1km restoration", "along the flowpath (km)"),
+                            theme = theme(title = element_text(size = 12, face = 2), plot.caption = element_text(hjust = 0.5))) &
+theme(text = element_text(size = 10))
 
 
-ggsave("Exports/1km.png", dpi=500)
+ggsave("Figures/1km.png", dpi=500)
 ```
 
 #% benefit of 1 km restoration projects compared to unrestored conditions
-```{r}
+```{r plot-wider, fig.width=12, fig.height=4}
 
 plot_1kmdiff_km <- NO3_km %>%
   group_by(storm,plan, RestPathLoc_Km, Restoration_Location)%>%
@@ -566,10 +564,9 @@ plot_1kmdiff_km <- NO3_km %>%
   ggplot()+
   geom_line(aes(RestPathLoc_Km, km_diff_Unr1mgL, color = storm))+
   geom_point(aes(RestPathLoc_Km, km_diff_Unr1mgL, color = storm, shape = Restoration_Location))+
-  xlab("Location of 1km restoration \n along the flowpath (km)")+
-  ylab("% Watershed NO3 Removed \n by 1km Length of Restoration")+
-  ggtitle("km")+
-  theme(aspect.ratio = 1)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  ggtitle(expression("k"[m]))+
   theme(legend.spacing.y = unit(0.2, 'cm'))
 
 plot_1kmdiff_k90 <- NO3_km %>%
@@ -578,10 +575,9 @@ plot_1kmdiff_k90 <- NO3_km %>%
   ggplot()+
   geom_line(aes(RestPathLoc_Km, k90_diff_Unr1mgL, color = storm))+
   geom_point(aes(RestPathLoc_Km, k90_diff_Unr1mgL, color = storm, shape = Restoration_Location))+
-  xlab("Location of 1km restoration \n along the flowpath (km)")+
-  ylab("% Watershed NO3 Removed \n by 1km Length of Restoration")+
-  ggtitle("k90")+
-  theme(aspect.ratio = 1)+
+  xlab(element_blank())+
+  ylab(element_blank())+
+  ggtitle(expression("k"[90]))+
   theme(legend.spacing.y = unit(0.2, 'cm'))
 
 plot_1kmdiff_k10 <- NO3_km %>%
@@ -590,18 +586,18 @@ plot_1kmdiff_k10 <- NO3_km %>%
   ggplot()+
   geom_line(aes(RestPathLoc_Km, k10_diff_Unr1mgL, color = storm))+
   geom_point(aes(RestPathLoc_Km, k10_diff_Unr1mgL, color = storm, shape = Restoration_Location))+
-  xlab("Location of 1km restoration \n along the flowpath (km)")+
-  ylab("% Watershed NO3 Removed \n by 1km Length of Restoration")+
-  ggtitle("k10")+
-  theme(aspect.ratio = 1)+
+  xlab(element_blank())+
+  ylab(expression("% Watershed NO"[3]*" Removed", "by 1km Length of Restoration"))+
+  ggtitle(expression("k"[10]))+
   theme(legend.spacing.y = unit(0.2, 'cm'))
 
-plot_1kmdiff_k10 + theme(text = element_text(size = 7)) + plot_1kmdiff_km + theme(text = element_text(size = 7)) +
-  plot_1kmdiff_k90 + theme(text = element_text(size = 7)) +
+plot_1kmdiff_k10  + plot_1kmdiff_km +  plot_1kmdiff_k90 + 
   plot_layout(ncol = 3, guides = "collect")+
-            plot_annotation(title = 'Additional Benefit in NO3 Removal produced by 1 Km Length Restoration',
-                            theme = theme(title = element_text(size = 8, face = 2)))
+            plot_annotation(title = expression("Percent of the Watershed NO"[3]*" Load Removed in the 1 km Length of Restoration"),
+                            caption = expression("Location of 1km restoration", "along the flowpath (km)"),
+                            theme = theme(title = element_text(size = 12, face = 2)))&
+  theme(text = element_text(size = 10)) 
 
-ggsave("Exports/1km_addBenefit.png", dpi=500)
+ggsave("Figures/1km_addBenefit.png", dpi=500)
 ```
 

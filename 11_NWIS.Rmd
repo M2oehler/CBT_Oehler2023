@@ -1,0 +1,371 @@
+---
+title: "NWIS Nitrate"
+output: html_document
+date: "2023-07-19"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dataRetrieval)
+library(EGRET)
+library(tidyverse)
+theme_set(theme_classic())
+vignette("dataRetrieval", package = "dataRetrieval")
+```
+
+```{r}
+# NWIS data workflow:
+siteNumber <- c("01491000", "01594526", "01658000")
+startDate <- "2022-10-01"
+endDate <- "2023-08-01"
+parameter <- "00631" #Nitrate, water, filtered, milligrams per liter as nitrate. Dissolved
+
+DailyData <- readNWISDaily("01491000", parameter, "","")
+
+# %>%
+  # renameNWISColumns()
+
+
+#parameter codes relating to nitrate
+pcode <- readNWISpCode("all")
+NO3codes <- pcode[grep("nitrate",
+                       pcode$parameter_nm,
+                       ignore.case = TRUE),]
+
+```
+
+#MD NO3 measurement locations
+```{r}
+#code from USGS https://waterdata.usgs.gov/blog/dataretrieval/. I changed the code to plot MD.
+MD_NO3_sites <- whatNWISsites(stateCd = "MD", 
+                          parameterCd = "99133")
+MD_siteData <- whatNWISdata(stateCd = "MD", 
+                          parameterCd = "99133")
+
+sites_yrDataMD <- MD_siteData %>% 
+  filter(count_nu > 600) %>% #count_nu = number of NO3 data points. list of sites with at least a years worth of data and 1460 observations (enough data to be weekly but doesnt mean the data is weekly)
+  mutate(period = as.Date(end_date) - as.Date(begin_date)) %>%
+  filter(period >= 365)
+
+YRsite_infoMD <- readNWISsite(sites_yrDataMD$site_no)%>%
+  filter( drain_area_va > 5) #Drainage area is in square miles. Our model is ~80 mi2
+
+?readNWISsite
+library(ggplot2)
+library(ggsn)
+library(sf)
+library(dplyr)
+
+usa <- st_as_sf(maps::map("state", fill=TRUE, plot =FALSE),
+                  crs = 4269)
+
+sf_md <- st_as_sf(sites_yrData, 
+                  coords = c("dec_long_va", "dec_lat_va"),
+                  crs = 4269)
+ggplot() +
+    geom_sf(data = usa[ usa$ID == "maryland" ,]) +
+    geom_sf(data = sf_md) + 
+    xlab(NULL)+
+    ylab(NULL)+
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    north(sf_md, symbol=10, location="bottomleft") +
+    scalebar(usa[ usa$ID == "maryland" ,],
+             dist=100, dist_unit="mi", st.size = 3,
+             transform=TRUE, model="WGS84")
+
+```
+
+```{r plot-wider, fig.width=15, fig.height=7}
+#code from USGS https://waterdata.usgs.gov/blog/dataretrieval/. I changed the code to plot MD.
+VA_NO3_sites <- whatNWISsites(stateCd = "VA", 
+                          parameterCd = "99133")
+VA_siteData <- whatNWISdata(stateCd = "VA", 
+                          parameterCd = "99133") #all VA sites with NO3 data
+
+sites_yrData <- VA_siteData %>% #list of sites with at least a years worth of data and 1460 observations (enough data to be weekly but doesnt mean the data is weekly)
+  filter(count_nu > 600) %>% #count_nu = number of NO3 data points
+  mutate(period = as.Date(end_date) - as.Date(begin_date)) %>%
+  filter(period >= 365)
+
+
+YRsite_info <- readNWISsite(sites_yrData$site_no)%>% #gage info on sites with data for at least a year and within 50-112 mi2 DA
+  filter(drain_area_va > 10) #Drainage area is in square miles. Our model is ~80 mi2
+
+# ?readNWISsite
+library(ggplot2)
+library(ggsn)
+library(sf)
+library(dplyr)
+
+#Mapping VA and MD sites together. First combine the MD and VA sites
+mapSites <- rbind(YRsite_info, YRsite_infoMD)
+
+#converts US map to a sf object so can be plotted filters to MD and VA:
+usa <- st_as_sf(maps::map("state", fill=TRUE, plot =FALSE), #uses map function to grab us states
+                  crs = 4269)%>%
+  filter(ID == "maryland" | ID == "virginia")
+
+#converts gage coordinates to an sf object:
+sf_va <- st_as_sf(mapSites, 
+                  coords = c("dec_long_va", "dec_lat_va"),
+                  crs = 4269)
+ggplot() +
+    geom_sf(data = usa[ usa$ID,]) + #plots MD and VA polygons
+    geom_sf(data = sf_va, aes(color = sf_va$station_nm), size = 5) +
+    labs(color = "Gage Name")+
+    theme(legend.title = element_text(size = 5), 
+               legend.text = element_text(size = 5))+
+    xlab(NULL)+
+    ylab(NULL)+
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    north(sf_md, symbol=10, location="bottomleft") +
+    scalebar(usa[ c("virginia", "maryland") ,],
+             dist=100, dist_unit="mi", st.size = 3,
+             transform=TRUE, model="WGS84")
+
+ggsave("Figures/gageLocation.png", dpi=500, height = 8, width = 12,  units="in")
+```
+
+
+```{r}
+#testing to make sure there is 15 min data for a year
+siteNumber <- "01646000"
+info_difficultRun <- readNWISsite("01646000")
+parameterCd <- "00060"
+
+rawDaily <- readNWISuv("01646000", c("99133", "00060"), "2021-10-01","2022-09-30")%>%
+  renameNWISColumns()
+#I found 2 gages for NO3+NO2 with the code 99133, scotty suggests 00631. The difference is 99133 is specifically in situ.
+
+test <- readNWISuv("01589485", "99133", "","")
+
+parameterCd <- "00618"
+qwData <- readNWISqw(siteNumber, parameterCd, "", "")
+#VA site contenders
+#01632900* 15 min data since 2012, takes a long time to load since so much data, constrain the range
+#01646000*
+#01654000
+#01673000 big drainage area
+#02035000* big drainage area
+
+#MD site contenders
+#01493112 small area
+#01579550 big area
+#01646500 big area
+#01589485*
+
+readNWISpCode(parameterCd)
+```
+
+```{r}
+#organizing a table with area, start and end date, and data points.
+siteDates <- whatNWISdata(siteNumber = mapSites$site_no, 
+                        parameterCd = "99133")%>% 
+  filter(ts_id == "68097"|ts_id == "68133"|ts_id =="144702"|ts_id == "144825"|ts_id == "68491"|ts_id == "146656"|ts_id == "163860"|ts_id == "145277"| ts_id == "243469")%>%
+  select(site_no, begin_date, end_date)
+siteSUM <- full_join(mapSites, siteDates, by = "site_no")%>%
+  select(site_no, station_nm, dec_lat_va, dec_long_va, drain_area_va, begin_date, end_date)
+
+colnames(siteSUM)[5] ="DA_mi2"
+
+write.csv(siteSUM, file="13_Exports/monitor_siteSUM.csv")
+```
+
+```{r}
+#Estimate flux for 2017-2018. Jones falls only has data for that time period and I want to use the same time period for all the gages
+# siteNo
+parameterCd <- c("00060", "99133")
+startDate <- "2019-10-01T00:00"
+endDate <- "2020-09-30T23:59"
+timeZone <- "America/New_York"
+
+yrflux_difficult <- readNWISuv("01646000", parameterCd, startDate, endDate, timeZone)%>%
+  renameNWISColumns()
+colnames(yrflux_difficult)[6] ="NO3conc_mgL"
+colnames(yrflux_difficult)[4] ="Q_cfs"
+
+#Plot 
+yrflux_difficult%>% 
+  pivot_longer(c(Q_cfs, NO3conc_mgL))%>%
+  ggplot()+
+  geom_line(aes(x = dateTime, y = value))+
+  facet_wrap(~name, nrow = 2, scales = "free",
+             strip.position = "left")+
+  theme(strip.background = element_blank(),
+        strip.placement='outside')+
+  labs(x = "Date/Time", y = NULL)+
+  ggtitle( yrflux_difficult$site_no[1])
+
+#Check how many values are missing
+sum(is.na(yrflux_difficult$NO3conc_mgL))
+sum(is.na(yrflux_difficult$Q_cfs))
+
+#find if the NAs are consecuative. If they are it may not be logical to just duplicate the value preceding
+yrflux_difficult%>%filter(is.na(Q_cfs))
+yrflux_difficult%>%filter(is.na(NO3conc_mgL))
+
+library(zoo)
+yrflux_difficult$Q_cfs <-na.locf(na.locf(yrflux_difficult$Q_cfs),fromLast=TRUE)
+   #use the na.locf function to replace NA values with the values from the preceding row. this is okay bc flow does not usually change that much in 15 mins at baseflow.
+
+#find percentiles of conc to use the 25th percentile in replacement for any NA concentrations
+quant_difficult <- quantile(yrflux_difficult$NO3conc_mgL, na.rm = TRUE)
+yrflux_difficult$NO3conc_mgL[is.na(yrflux_difficult$NO3conc_mgL)] <- quant_difficult[2]
+
+yrflux_difficult <- yrflux_difficult%>% 
+  # group_by(site_no)%>%
+  select(site_no, dateTime, Q_cfs, NO3conc_mgL)%>%
+  mutate(NO3_kg =
+           Q_cfs*NO3conc_mgL*15*60*28.32/1000/1000)
+sum(yrflux_difficult$NO3conc_mgL)
+
+```
+
+
+```{r}
+yrflux_james <- readNWISuv("02035000", parameterCd, startDate, endDate, timeZone)%>%
+  renameNWISColumns()
+colnames(yrflux_james)[6] ="NO3conc_mgL"
+colnames(yrflux_james)[4] ="Q_cfs"
+
+#Plot 
+yrflux_james%>% 
+  pivot_longer(c(Q_cfs, NO3conc_mgL))%>%
+  ggplot()+
+  geom_line(aes(x = dateTime, y = value))+
+  facet_wrap(~name, nrow = 2, scales = "free",
+             strip.position = "left")+
+  theme(strip.background = element_blank(),
+        strip.placement='outside')+
+  labs(x = "Date/Time", y = NULL)+
+  ggtitle( yrflux_james$site_no[1])
+
+#Check how many values are missing
+sum(is.na(yrflux_james$NO3conc_mgL))
+sum(is.na(yrflux_james$Q_cfs))
+
+#find if the NAs are consecuative. If they are it may not be logical to just duplicate the value preceding
+yrflux_james%>%filter(is.na(Q_cfs))
+yrflux_james%>%filter(is.na(NO3conc_mgL))
+
+yrflux_james$Q_cfs <-na.locf(na.locf(yrflux_james$Q_cfs),fromLast=TRUE)
+   #use the na.locf function to replace NA values with the values from the preceding row. this is okay bc flow does not usually change that much in 15 mins at baseflow.
+
+#find percentiles of conc to use the 25th percentile in replacement for any NA concentrations
+quant_james <- quantile(yrflux_james$NO3conc_mgL, na.rm = TRUE)
+yrflux_james$NO3conc_mgL[is.na(yrflux_james$NO3conc_mgL)] <- quant_james[2]
+
+yrflux_james <- yrflux_james%>% 
+  # group_by(site_no)%>%
+  select(site_no, dateTime, Q_cfs, NO3conc_mgL)%>%
+  mutate(NO3_kg =
+           Q_cfs*NO3conc_mgL*15*60*28.32/1000/1000)
+sum(yrflux_james$NO3conc_mgL)
+
+
+
+#make a table of quartile conc and number of missing values.
+gageQuart <- data.frame(quant_difficult, quant_james, quant_pam, quant_chester)
+```
+
+```{r}
+
+yrflux_pamunkey <- readNWISuv("01673000", parameterCd, startDate, endDate, timeZone)%>%
+  renameNWISColumns()
+colnames(yrflux_pamunkey)[6] ="NO3conc_mgL"
+colnames(yrflux_pamunkey)[4] ="Q_cfs"
+
+#Plot 
+yrflux_pamunkey%>% 
+  pivot_longer(c(Q_cfs, NO3conc_mgL))%>%
+  ggplot()+
+  geom_line(aes(x = dateTime, y = value))+
+  facet_wrap(~name, nrow = 2, scales = "free",
+             strip.position = "left")+
+  theme(strip.background = element_blank(),
+        strip.placement='outside')+
+  labs(x = "Date/Time", y = NULL)+
+  ggtitle( yrflux_pamunkey$site_no[1])
+
+#Check how many values are missing
+sum(is.na(yrflux_pamunkey$NO3conc_mgL))
+sum(is.na(yrflux_pamunkey$Q_cfs))
+
+#find if the NAs are consecuative. If they are it may not be logical to just duplicate the value preceding
+yrflux_pamunkey%>%filter(is.na(Q_cfs))
+yrflux_pamunkey%>%filter(is.na(NO3conc_mgL))
+
+yrflux_pamunkey$Q_cfs <-na.locf(na.locf(yrflux_pamunkey$Q_cfs),fromLast=TRUE)
+   #use the na.locf function to replace NA values with the values from the preceding row. this is okay bc flow does not usually change that much in 15 mins at baseflow.
+
+#find percentiles of conc to use the 25th percentile in replacement for any NA concentrations
+quant_pam <- quantile(yrflux_pamunkey$NO3conc_mgL, na.rm = TRUE)
+yrflux_pamunkey$NO3conc_mgL[is.na(yrflux_pamunkey$NO3conc_mgL)] <- quant_pam[2]
+quantiles[2]
+
+yrflux_pamunkey <- yrflux_pamunkey%>% 
+  # group_by(site_no)%>%
+  select(site_no, dateTime, Q_cfs, NO3conc_mgL)%>%
+  mutate(NO3_kg =
+           Q_cfs*NO3conc_mgL*15*60*28.32/1000/1000)
+sum(yrflux_pamunkey$NO3conc_mgL)
+
+```
+
+```{r}
+yrflux_chester <- readNWISuv("01493112", parameterCd, startDate, endDate, timeZone)%>%
+  renameNWISColumns()
+colnames(yrflux_chester)[6] ="NO3conc_mgL"
+colnames(yrflux_chester)[4] ="Q_cfs"
+
+#Plot 
+yrflux_chester%>% 
+  pivot_longer(c(Q_cfs, NO3conc_mgL))%>%
+  ggplot()+
+  geom_line(aes(x = dateTime, y = value))+
+  facet_wrap(~name, nrow = 2, scales = "free",
+             strip.position = "left")+
+  theme(strip.background = element_blank(),
+        strip.placement='outside')+
+  labs(x = "Date/Time", y = NULL)+
+  ggtitle( yrflux_chester$site_no[1])
+
+#Check how many values are missing
+sum(is.na(yrflux_chester$NO3conc_mgL))
+sum(is.na(yrflux_chester$Q_cfs))
+
+#find if the NAs are consecuative. If they are it may not be logical to just duplicate the value preceding
+yrflux_chester%>%filter(is.na(Q_cfs))
+yrflux_chester%>%filter(is.na(NO3conc_mgL))
+
+yrflux_chester$Q_cfs[1] <- 5.76
+yrflux_chester$Q_cfs <-na.locf(na.locf(yrflux_chester$Q_cfs),fromLast=TRUE)
+   #use the na.locf function to replace NA values with the values from the preceding row. this is okay bc flow does not usually change that much in 15 mins at baseflow.
+
+#find percentiles of conc to use the 25th percentile in replacement for any NA concentrations
+quant_chester <- quantile(yrflux_chester$NO3conc_mgL, na.rm = TRUE)
+yrflux_chester$NO3conc_mgL[is.na(yrflux_chester$NO3conc_mgL)] <- quant_chester[2]
+
+yrflux_chester <- yrflux_chester%>% 
+  # group_by(site_no)%>%
+  select(site_no, dateTime, Q_cfs, NO3conc_mgL)%>%
+  mutate(NO3_kg =
+           Q_cfs*NO3conc_mgL*15*60*28.32/1000/1000)
+sum(yrflux_chester$NO3conc_mgL)
+```
+
+```{r}
+
+#Check what days/times are missing from the dataset. Just a gauge on how uncertain the load estimate will be
+missingTimes <- data.frame(timeCheck$timeCheck[!timeCheck$timeCheck %in% yrflux_difficult$dateTime])
+
+colnames(timeCheck)[1] ="timeCheck"
+timeCheck <- data.frame(seq(ymd_hm('2019-10-01 00:00'),ymd_hm('2020-09-30 23:45'), by = '15 mins'))
+
+```
+

@@ -1,0 +1,73 @@
+---
+title: "Load Removal Comparison Between Rivers"
+output: html_document
+date: "2023-05-18"
+---
+#Test case for a fully restored watershed, Q1 storm, and 15-min HECRAS data output. 
+###Comparison of NO3 removal among rivers of the same order. Answering the question: is removal uniform within an order? Answer: relatively yes. There is a difference of grams or tens of grams.
+
+#Housekeeping:
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(dplyr)
+library(tidyverse)
+library(stringr)
+library(tidyr)
+```
+
+#Constants
+```{r}
+watershed_load <- 3653360.9 #total NO3 load to the watershed (grams)
+#load1 <- 4290.59 #input load to a single first order stream (grams) for full4th100p
+#load2 <- 37795.52 #input load to a single second order stream (grams) for full4th100p
+#load3 <- 371227.69 #input load to a single third order stream (grams) for full4th100p
+#load4 <- 3548993.81 #input load to the fourth order stream (grams) for full4th100p
+
+k <- 0.061 
+#1.3 90th percentile actual rate from database (mg-N/ft2-hr) #12.08 max from EST paper  #15.97 max actual from database #0.061 median actual from database #0.8178  median potential from database
+Xcs <- 50 #Distance between cross sections (ft)
+
+
+w_1stO <- 60 #width of one 1st order floodplain (ft)
+w_2ndO <- 65 #width of one 2nd order floodplain (ft)
+w_3rdO <- 75 #width of one 3rd order floodplain (ft)
+w_4thO <- 130 #width of one 4th order floodplain (ft)
+```
+
+#First-order
+```{r}
+ALL1st_Q1 <- read_csv("ALL1st_Q1_full4th100p.csv")%>%
+  group_by(river, STA) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_1stO ~ 15)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>% #how long each XS is inundated
+  mutate(
+    removal_g = case_when(STA %in% c(133500, 139000, 144500, 154500, 160000,165500,127500, 133000, 138500, 148500, 
+                                   154000, 159500) ~ (ti_tot_min/60)*(Xcs/2)*(w_1stO*2)*k/1000,
+                                   TRUE ~ (ti_tot_min/60)*Xcs*(w_1stO*2)*k/1000)) %>%
+  summarise(removal_g = sum(removal_g))
+
+
+#write.csv(ALL1st_Q1, file = "Exports/ALL1st_Q1_full4th100p.csv")
+
+```
+
+#Second-order
+```{r}
+ALL2nd_Q1 <- read_csv("ALL2nd_Q1_full4th100p.csv")%>%
+  group_by(river, STA) %>%
+  mutate(
+    ti_min = case_when(RtopW_ft >= w_2ndO ~ 15)) %>%
+  summarise(
+    ti_tot_min = sum(ti_min, na.rm = TRUE)) %>% #how long each XS is inundated
+  mutate(
+    removal_g = case_when(STA %in% c(138500, 133000, 127500, 122000, 
+                                     159500, 154000, 148500, 143000) 
+                                        ~ (ti_tot_min/60)*(Xcs/2)*(w_1stO*2)*k/1000,
+                                    TRUE ~ (ti_tot_min/60)*Xcs*(w_1stO*2)*k/1000)) 
+
+write.csv(ALL2nd_Q1, file = "Exports/ALL2nd_Q1_full4th100p.csv")
+```
+

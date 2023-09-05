@@ -71,10 +71,10 @@ rm(dat, raw.file.paths, raw.files) #remove clutter from environment. These dataf
 
 #To save data frames in the environment
 # save(RAS_Full,
-#      file = "C:/Users/morganao/Documents/CBT_Oehler2023/9_Saved_Dataframes/Full_RAS_rawData.RData")
+#      file = "C:/Users/morganao/Documents/CBT_Oehler2023/12_Saved_Dataframes/Full_RAS_rawData.RData")
 
 # save(NO3_Full,
-#      file = "C:/Users/morganao/Documents/CBT_Oehler2023/9_Saved_Dataframes/Full_NO3_removals.RData")
+#      file = "C:/Users/morganao/Documents/CBT_Oehler2023/12_Saved_Dataframes/Full_InunTimes.RData")
 
 # Test <- NO3_Full %>%
 #   filter(storm == "Q1" & plan == "1st-20p" & river == "3-1" )
@@ -116,7 +116,7 @@ Qm_load1 <- 65880 #input load to a all first order streams (grams)
 Qm_load2 <- 3003 #input load to a all second order streams (grams)
 Qm_load3 <- 26865 #input load to a all third order streams (grams)
 Qm_load4 <- 149414 #input load to the fourth order stream (grams)
-
+  
 NO3_Full <- RAS_Full %>%
   group_by(storm, plan, STA, river) %>%
   mutate(

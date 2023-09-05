@@ -1,0 +1,231 @@
+---
+title: "Yearly flux estimations"
+output: html_document
+date: "2023-07-28"
+---
+#Load SO_NO3_removals.RData in "9_Saved_Dataframes"
+
+#Housekeeping
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(tidyverse)
+library(stringr)
+library(tidyr)
+library(scales)
+
+library(readr)
+theme_set(theme_classic())
+
+#removal rates in mg-N/ft2.hr. Converted to g in the removal calc below.
+k10 <- 0.0067
+km <- 0.061
+k90 <- 1.3
+Xcs <- 50 #Distance between cross sections (ft)
+
+```
+
+#DF containing load removal from the watershed for every SO plan
+```{r  plot-wider, fig.width=9, fig.height=5}
+yr_shedRem$storm <- factor(yr_shedRem$storm,                 # Re-level group factor
+                         levels = c("Q2", "Q1", "Q0.5", "Qm"))
+yr_shedRem$storm <- as.character(yr_shedRem$storm)
+
+#remove unr rows from 3 df before combining so it isnt accounted for 4 times when summing. I add the unr scenario back for the 2nd, 3rd, 4th restoration later for plotting purposes.
+NO3_2ndO <- NO3_2ndO[!NO3_2ndO$plan == "unr", ]
+NO3_3rdO <- NO3_3rdO[!NO3_3rdO$plan == "unr", ]
+NO3_4thO <- NO3_4thO[!NO3_4thO$plan == "unr", ]
+#check
+NO3_2ndO%>%filter(plan == "unr")
+
+yr_shedRem <- bind_rows(NO3_1stO, NO3_2ndO, NO3_3rdO, NO3_4thO) %>%
+  select(storm:percentRest) %>%
+  mutate(sort_storm = case_when(storm ==  "Qm" ~0,
+                                storm ==  "Q0.5"~0.5,
+                                storm ==  "Q1"~ 1, 
+                                storm == "Q2"~ 2),
+         sort_order = case_when(startsWith(plan, "unr")~ 0, 
+                                startsWith(plan, "1st")~ 1,
+                                startsWith(plan, "2nd")~ 2,
+                                startsWith(plan, "3rd")~ 3,
+                                startsWith(plan, "4th")~ 4))
+
+
+#Sort the rows so they are in order of decreasing storm and increasing percent restoration
+
+yr_shedRem <- arrange(yr_shedRem, desc(sort_storm), sort_order, percentRest) %>%
+  group_by(storm, plan, percentRest)%>%
+  summarise(removal_km_g = sum(removal_km_g),
+            removal_k10_g = sum(removal_k10_g),
+            removal_k90_g = sum(removal_k90_g))%>% #removal from the watershed for each plan
+  ungroup(storm)%>%
+  group_by(plan, percentRest)%>%
+  mutate(yr_stormLoad = 
+           case_when(storm == "Q2" ~ Q2_watershed_load, 
+                     storm == "Q1" ~ Q1_watershed_load,
+                     storm == "Q0.5" ~ Q0.5_watershed_load*2,
+                     storm == "Qm" ~ Qm_watershed_load*12),
+         yr_remload_km = case_when(storm == "Q2" ~ removal_km_g, 
+                     storm == "Q1" ~ removal_km_g,
+                     storm == "Q0.5" ~ removal_km_g*2,
+                     storm == "Qm" ~ removal_km_g*12),
+         yr_remload_k10 = case_when(storm == "Q2" ~ removal_k10_g, 
+                     storm == "Q1" ~ removal_k10_g,
+                     storm == "Q0.5" ~ removal_k10_g*2,
+                     storm == "Qm" ~ removal_k10_g*12),
+         yr_remload_k90 = case_when(storm == "Q2" ~ removal_k90_g, 
+                     storm == "Q1" ~ removal_k90_g,
+                     storm == "Q0.5" ~ removal_k90_g*2,
+                     storm == "Qm" ~ removal_k90_g*12)) %>%
+  summarize(yr_stormLoad_kg = sum(yr_stormLoad)/1000,
+            km_yr_stormRem_kg = sum(yr_remload_km)/1000,
+            k10_yr_stormRem_kg = sum(yr_remload_k10)/1000,
+            k90_yr_stormRem_kg = sum(yr_remload_k90)/1000) %>%
+  mutate(add_baseLoad_kg = 30865,
+         yr_hypRem_kg = case_when(plan == "unr" ~ 0,#these loads are how much is removed by the hyp restoration in place over the whole year. These values do not change with storm size.For hyp removal, removal only occurs in the restored river. There is no hyporheic removal anywhere else.
+                               plan == "1st-20p"~ 107,
+                               plan == "1st-40p"~ 257,
+                               plan == "1st-60p"~ 452,
+                               plan == "1st-80p"~ 692,
+                               plan == "1st-100p"~ 1050,
+                               plan == "2nd-20p"~ 41,
+                               plan == "2nd-60p"~ 155,
+                               plan == "2nd-80p"~ 229,
+                               plan == "2nd-100p"~ 314,
+                               plan == "3rd-20p"~ 417,
+                               plan == "3rd-40p"~ 928,
+                               plan == "3rd-60p"~ 1403,
+                               plan == "3rd-80p"~ 1804,
+                               plan == "3rd-100p"~ 2265,
+                               plan == "4th-20p"~ 6591,
+                               plan == "4th-40p"~ 10118,
+                               plan == "4th-60p"~ 12763,
+                               plan == "4th-80p"~ 15100,
+                               plan == "4th-100p"~ 17357),
+         pRem_km = (km_yr_stormRem_kg+yr_hypRem_kg)/(yr_stormLoad_kg+add_baseLoad_kg)*100,
+         pRem_k10 = (k10_yr_stormRem_kg+yr_hypRem_kg)/(yr_stormLoad_kg+add_baseLoad_kg)*100,
+         pRem_k90 = (k90_yr_stormRem_kg+yr_hypRem_kg)/(yr_stormLoad_kg+add_baseLoad_kg)*100,
+         H_Prem = (yr_hypRem_kg)/(yr_stormLoad_kg+add_baseLoad_kg)*100,
+         S_Prem_km = (km_yr_stormRem_kg)/(yr_stormLoad_kg+add_baseLoad_kg)*100,
+         S_Prem_k10 = (k10_yr_stormRem_kg)/(yr_stormLoad_kg+add_baseLoad_kg)*100,
+         S_Prem_k90 = (k90_yr_stormRem_kg)/(yr_stormLoad_kg+add_baseLoad_kg)*100,
+         restLoc = 
+           case_when(startsWith(plan, "unr") ~ "1st-order Restoration",
+                     startsWith(plan, "1st") ~ "1st-order Restoration",
+                     startsWith(plan, "2nd") ~ "2nd-order Restoration",
+                     startsWith(plan, "3rd") ~ "3rd-order Restoration",
+                     startsWith(plan, "4th") ~ "4th-order Restoration"))
+
+
+yr_ADDunr <- data.frame(plan = c("unr", "unr","unr"),
+                       percentRest = c(0, 0, 0),
+                       yr_stormLoad_kg = c(15683.62, 15683.62, 15683.62),
+                       km_yr_stormRem_kg = c(11.7922, 11.7922, 11.7922),
+                       k10_yr_stormRem_kg = c(1.295748, 1.295748, 1.295748),
+                       k90_yr_stormRem_kg = c(251.3093, 251.3093, 251.3093),
+                       add_baseLoad_kg = c(30865,30865, 30865), 
+                       yr_hypRem_kg = c(0,0,0),
+                       pRem_km = c(0.02533309, 0.02533309, 0.02533309),
+                       pRem_k10 = c(0.002783643, 0.002783643, 0.002783643),
+                       pRem_k90 = c(0.5398856, 0.5398856, 0.5398856),
+                       H_Prem = c(0,0,0),
+                       S_Prem_km = c(0.02533309, 0.02533309, 0.02533309),
+                       S_Prem_k10 =  c(0.002783643, 0.002783643, 0.002783643), 
+                       S_Prem_k90 =  c(0.5398856, 0.5398856, 0.5398856), 
+                       restLoc = c("2nd-order Restoration", "3rd-order Restoration", "4th-order Restoration"))
+
+yr_shedRem <- bind_rows(yr_shedRem, yr_ADDunr)
+
+yr_shedRem %>% 
+  ggplot()+
+  geom_line(aes(percentRest, pRem_km, color = "Total Removal"), linewidth = 0.3)+
+  geom_point(aes(percentRest, pRem_km, color = "Total Removal"), size = 0.8)+
+  geom_line(aes(percentRest, H_Prem, color = "Hyporheic Removal"), linewidth = 0.3)+
+  geom_point(aes(percentRest, H_Prem,  color = "Hyporheic Removal"), size = 0.8)+
+  geom_line(aes(percentRest, S_Prem_km, color = "Floodplain Removal"), linewidth = 0.3)+
+  geom_point(aes(percentRest, S_Prem_km, color = "Floodplain Removal"), size = 0.8)+
+  facet_wrap( ~restLoc, scales = "free", ncol = 2)+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylab(expression("Percent NO"[3]*" Removed from the Watershed"))+
+  xlab("Percent Restoration")+
+  ggtitle(expression("Yearly Percent Nitrate Removal from the 4"^th*"-order Watershed- k"[m]*""))+ 
+  labs(color='Removal Type') +
+  theme(text = element_text(size = 8), 
+        title = element_text(size = 10))
+
+# write.csv(shedPremLoads, file = "CBT_Oehler2023/10_Exports/emals.csv")
+
+ggsave("Figures/yr_Prem_km.png", height = 5, width = 7, dpi=500, units="in")
+
+yr_shedRem <- yr_shedRem%>%
+  mutate(flux = yr_stormLoad_kg + add_baseLoad_kg - km_yr_stormRem_kg - yr_hypRem_kg)
+
+```
+
+
+```{r plot-wider, fig.width=14, fig.height=4}
+
+yr_shedRem$plan <- factor(yr_shedRem$plan,                 # Re-level group factor
+                         levels = c("unr", "1st-20p", "1st-40p", "1st-60p", "1st-80p", "1st-100p", "2nd-20p", "2nd-60p", "2nd-80p", "2nd-100p", "3rd-20p", "3rd-40p", "3rd-60p", "3rd-80p", "3rd-100p",  "4th-20p", "4th-40p", "4th-60p", "4th-80p", "4th-100p"))
+
+yr_shedRem$plan <- as.character(yr_shedRem$plan)
+
+yr_shedRem%>%
+  select(plan:km_yr_stormRem_kg, add_baseLoad_kg, yr_hypRem_kg, restLoc)%>%
+  # select(plan:km_yr_stormRem_kg, add_baseLoad_kg, yr_hypRem_kg, restLoc)%>%
+  # filter(startsWith(plan, "1st") | startsWith(plan, "unr"))%>%
+  pivot_longer(cols = c(yr_stormLoad_kg, km_yr_stormRem_kg, add_baseLoad_kg, yr_hypRem_kg))%>%
+  # pivot_longer(cols = c( km_yr_stormRem_kg, yr_hypRem_kg))%>%
+  group_by(plan)%>%
+  ggplot()+
+  geom_col(aes(x= plan, y = value, fill = name), position = "dodge")+
+  facet_wrap( ~restLoc, scales = "free", ncol = 2)+
+  scale_fill_discrete(labels=c('Baseflow Load', 'FP Removal', 'Hyporheic Removal', 'Stormflow Load'))+
+  # scale_fill_discrete(labels=c('FP Removal', 'Hyporheic Removal'))+
+  labs(y = "Yearly Nitrate Load or Load Removed", x = "Restoration Plan")+
+  ggtitle(expression("Yearly 4th-order Watershed Loads and Loads Removed- k"[m]*""))
+```
+
+
+#k10 & k90 FP rate yearly plots
+```{r}
+#k10
+yr_shedRem %>% 
+  ggplot()+
+  geom_line(aes(percentRest, pRem_k10, color = "Total Removal"), linewidth = 0.3)+
+  geom_point(aes(percentRest, pRem_k10, color = "Total Removal"), size = 0.8)+
+  geom_line(aes(percentRest, H_Prem, color = "Hyporheic Removal"), linewidth = 0.3)+
+  geom_point(aes(percentRest, H_Prem,  color = "Hyporheic Removal"), size = 0.8)+
+  geom_line(aes(percentRest, S_Prem_k10, color = "Floodplain Removal"), linewidth = 0.3)+
+  geom_point(aes(percentRest, S_Prem_k10, color = "Floodplain Removal"), size = 0.8)+
+  facet_wrap( ~restLoc, scales = "free", ncol = 2)+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylab(expression("Percent NO"[3]*" Removed from the Watershed"))+
+  xlab("Percent Restoration")+
+  ggtitle(expression("Yearly Percent Nitrate Removal from the 4"^th*"-order Watershed- k"[10]*""))+ 
+  labs(color='Removal Type') +
+  theme(text = element_text(size = 8), 
+        title = element_text(size = 10))
+ggsave("Figures/yr_Prem_k10.png", height = 5, width = 7, dpi=500, units="in")
+
+#k90
+yr_shedRem %>% 
+  ggplot()+
+  geom_line(aes(percentRest, pRem_k90, color = "Total Removal"), linewidth = 0.3)+
+  geom_point(aes(percentRest, pRem_k90, color = "Total Removal"), size = 0.8)+
+  geom_line(aes(percentRest, H_Prem, color = "Hyporheic Removal"), linewidth = 0.3)+
+  geom_point(aes(percentRest, H_Prem,  color = "Hyporheic Removal"), size = 0.8)+
+  geom_line(aes(percentRest, S_Prem_k90, color = "Floodplain Removal"), linewidth = 0.3)+
+  geom_point(aes(percentRest, S_Prem_k90, color = "Floodplain Removal"), size = 0.8)+
+  facet_wrap( ~restLoc, scales = "free", ncol = 2)+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  ylab(expression("Percent NO"[3]*" Removed from the Watershed"))+
+  xlab("Percent Restoration")+
+  ggtitle(expression("Yearly Percent Nitrate Removal from the 4"^th*"-order Watershed- k"[90]*""))+ 
+  labs(color='Removal Type') +
+  theme(text = element_text(size = 8), 
+        title = element_text(size = 10))
+ggsave("Figures/yr_Prem_k90.png", height = 5, width = 7, dpi=500, units="in")
+```
+
