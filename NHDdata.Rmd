@@ -1,0 +1,90 @@
+---
+title: "NHDdata"
+output: html_document
+date: "2023-10-03"
+---
+#I could not select only the main channel attributes in Arc so I am filtering the table with all stream data to the reach codes I selected.
+
+#Load text files
+```{r}
+#VAA tables have the watershed data. Gwynn_VAAall contains data for every segment in Gwynns GIS file.
+
+Gwynn_VAAall <- read_csv("CSV_NHD/StreamlineVAA_all.csv") 
+Gwynn_VAAall$NHDPlusID <- format(Gwynn_VAAall$NHDPlusID, scientific = F)
+Gwynn_VAAall <- Gwynn_VAAall%>%
+  select(NHDPlusID:StreamCalc, PathLength, DnLevel:DnLevelPat, AreaSqKm:DivDASqKm, Slope, SlopeLenKm)%>%
+  filter(SlopeLenKm>0)
+
+GwynnOutlet_VAA <- left_join(GwynnOutlet, Gwynn_VAAall, by = "NHDPlusID")%>%
+  mutate(seg_weight = SlopeLenKm/39.94166) #%of flow path represented by that segment
+```
+
+```{r}
+GwynnOutlet <- read_csv("CSV_NHD/GwynnsFalls_streamline.csv")%>%
+  select(NHDPlusID)
+GwynnOutlet$NHDPlusID <- format(GwynnOutlet$NHDPlusID, scientific = F)
+
+GwynnOutlet_VAA <- left_join(GwynnOutlet, Gwynn_VAAall, by = "NHDPlusID")%>%
+  mutate(seg_weight = SlopeLenKm/39.94166) #%of flow path represented by that segment
+
+GwynnOutlet_VAA%>%
+  summarise(pathLength_km = sum(SlopeLenKm, na.rm = TRUE), slope = sum(Slope*seg_weight, na.rm = TRUE))
+```
+```{r}
+villaNova <- read_csv("CSV_NHD/VillaNovaGage_streamline.csv")%>%
+  select(NHDPlusID)
+villaNova$NHDPlusID <- format(villaNova$NHDPlusID, scientific = F)
+
+villaNova_VAA <- left_join(villaNova, Gwynn_VAAall, by = "NHDPlusID")%>%
+  mutate(seg_weight = SlopeLenKm/22.27905) #%of flow path represented by that segment
+
+villaNova_VAA%>%
+  summarise(pathLength_km = sum(SlopeLenKm, na.rm = TRUE), slope = sum(Slope*seg_weight, na.rm = TRUE))
+```
+
+
+```{r}
+powderMill <- read_csv("CSV_NHD/Powder_streamline.csv")%>%
+  select(NHDPlusID)
+powderMill$NHDPlusID <- format(powderMill$NHDPlusID, scientific = F)
+
+powderMill_VAA <- left_join(powderMill, Gwynn_VAAall, by = "NHDPlusID")%>%
+  mutate(seg_weight = SlopeLenKm/5.168853)%>% #%of flow path represented by that segment
+  filter(StreamOrde == 2 | StreamOrde == 1)
+
+powderMill_VAA%>%
+  summarise(pathLength_km = sum(SlopeLenKm, na.rm = TRUE), slope = sum(Slope*seg_weight, na.rm = TRUE))
+```
+
+
+
+```{r}
+deadRun <- read_csv("CSV_NHD/DeadRun_streamline.csv")%>%
+  select(NHDPlusID)
+deadRun$NHDPlusID <- format(deadRun$NHDPlusID, scientific = F)
+
+deadRun_VAA <- left_join(deadRun, Gwynn_VAAall, by = "NHDPlusID")%>%
+  mutate(seg_weight = SlopeLenKm/4.675957	)%>% #%of flow path represented by that segment
+  filter(NHDPlusID %in% c("10000400024178","10000400033532","10000400033437","10000400000902","10000400000710","10000400014805",
+                          "10000400028836","10000400028838","10000400010191"))
+  
+deadRun_VAA%>%
+  summarise(pathLength_km = sum(SlopeLenKm, na.rm = TRUE), slope = sum(Slope*seg_weight, na.rm = TRUE))
+```
+
+
+```{r}
+maiden <- read_csv("CSV_NHD/Maidens_streamline.csv")%>%
+  select(NHDPlusID)
+maiden$NHDPlusID <- format(maiden$NHDPlusID, scientific = F)
+
+maiden_VAA <- left_join(maiden, Gwynn_VAAall, by = "NHDPlusID")%>%
+  mutate(seg_weight = SlopeLenKm/22.27905)%>% #%of flow path represented by that segment
+  filter(NHDPlusID %in% c("10000400024178","10000400033532","10000400033437","10000400000902","10000400000710","10000400014805",
+                          "10000400028836","10000400028838","10000400010191"))
+  
+maiden_VAA%>%
+  summarise(pathLength_km = sum(SlopeLenKm, na.rm = TRUE), slope = sum(Slope*seg_weight, na.rm = TRUE))
+```
+
+

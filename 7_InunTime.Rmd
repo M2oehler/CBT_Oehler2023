@@ -16,6 +16,277 @@ library(readr)
 library(patchwork)
 theme_set(theme_classic())
 
+#inun_ts_ALL has all scenarios for each river even when restoration is not within the specific river
+# save(inun_ts_ALL, 
+#     file = "C:/Users/morganao/Documents/CBT_Oehler2023/12_Saved_Dataframes/inun_ts_ALL.RData")
+```
+
+```{r}
+#all scenarios for every river inundation time
+inun_ts_ALL <- inun_ts%>%
+  filter(ti_hr>0)
+test <- inunVSrem %>%
+  ungroup(storm, plan)%>%
+  select(removal_scaled_kg,order)%>%
+  bind_cols(inun_ts_ALL)%>%
+  mutate(restLoc = 
+           case_when(restLoc == "1st"~ "1-7",
+                     restLoc == "2nd"~ "2-2",
+                     restLoc == "3rd"~ "3-1",
+                     restLoc == "4th"~ "4-1"))%>%
+  filter(river == restLoc)
+```
+
+
+```{r plot-wider, fig.width=16, fig.height=4}
+#inundation by time step method as opposed to summing inun time for each XS. Single order restoration scenarios.
+filter1stO <-   RAS_1stO %>% #there is no inundation in the second day of the simulation.Filter that out and all rivers outside of the river where restoration occurs.
+  filter(
+    day == "01SEP2008" & river == "1-7")
+filter2ndO <-   RAS_2ndO %>% 
+  filter(
+    day == "01SEP2008" & river == "2-2")
+filter3rdO <-   RAS_3rdO %>% 
+  filter(
+    day == "01SEP2008" & river == "3-1")
+filter4thO <-   RAS_4thO %>% 
+  filter(
+    day == "01SEP2008" & river == "4-1")
+
+TEST_inun <- inun_ts%>%
+  filter(plan == "4th-80p"|plan == "4th-100p")%>%
+  filter(storm == "Q2"& river == "4-1")
+
+inun_ts <- 
+  bind_rows(RAS_1stO,
+                     RAS_2ndO,
+                     RAS_3rdO,
+                     RAS_4thO) %>%
+  group_by(time, day, river, storm, plan)%>% 
+  mutate(
+    inun_ct = case_when(
+      wettedFPw >10 ~ 1, #giving a unit value to every timestep & XS 
+      TRUE~0))%>%
+  summarise(
+    inun_ct = sum(
+      inun_ct, na.rm = TRUE))%>% #represents the number of XS that are inundated at that timestep. I am just using this to show what time steps have water in them within the reach.
+  mutate(
+    inun_int = case_when( #assigning a 15-min interval to each timestep with water in FP
+      inun_ct >= 1~15, 
+      TRUE~0))%>%
+  group_by(storm, plan, river)%>%
+  summarise(
+    ti_hr = sum(inun_int)/60)%>% #value of inundation time in the reach for each plan and storm
+  mutate(
+    percentRest = case_when(
+      endsWith(plan, "100p")~ 100, #for plotting purposes
+      endsWith(plan, "80p")~ 80,
+      endsWith(plan, "60p")~ 60,
+      endsWith(plan, "40p")~ 40,
+      endsWith(plan, "20p")~ 20,
+      endsWith(plan, "unr")~ 0),
+    restLoc = case_when(
+      startsWith(plan, "unr") ~ "unr",
+      startsWith(plan, "1st") ~ "1st",
+      startsWith(plan, "2nd") ~ "2nd",
+      startsWith(plan, "3rd") ~ "3rd",
+      startsWith(plan, "4th") ~ "4th"))
+  
+
+
+inun_ts$storm <- factor(inun_ts$storm,                 # Re-level group factor
+                         levels = c("Q2", "Q1", "Q0.5", "Qm"))
+
+ts_inun_1st <- inun_ts%>%
+  filter(river == "1-7")%>%
+  filter(restLoc == "1st" | restLoc == "unr")%>%
+  ggplot()+
+  geom_line(aes(percentRest, ti_hr, color = storm, group = storm))+
+  geom_point(aes(percentRest, ti_hr, color = storm))+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  labs(x = expression(atop("Percent 1"^st*"-order streams restored")),
+       y = expression(atop("Floodplain Inundation Time (hr)")),
+       color = "Storm")+
+  ggtitle(expression("1"^st*"-order River"))
+
+ts_inun_2nd <- inun_ts%>%
+  filter(river == "2-2")%>%
+  filter(restLoc == "2nd" | restLoc == "unr")%>%
+  ggplot()+
+  geom_line(aes(percentRest, ti_hr, color = storm, group = storm))+
+  geom_point(aes(percentRest, ti_hr, color = storm))+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  labs(x = expression(atop("Percent 2"^nd*"-order streams restored")),
+       y = element_blank(),
+       color = "Storm")+
+  ggtitle(expression("2"^nd*"-order River"))
+
+ts_inun_3rd <- inun_ts%>%
+  filter(river == "3-1")%>%
+  filter(restLoc == "3rd" | restLoc == "unr")%>%
+  ggplot()+
+  geom_line(aes(percentRest, ti_hr, color = storm, group = storm))+
+  geom_point(aes(percentRest, ti_hr, color = storm))+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  labs(x = expression(atop("Percent 3"^rd*"-order streams restored")),
+       y = element_blank(),
+       color = "Storm")+
+  ggtitle(expression("3"^rd*"-order River"))
+
+ts_inun_4th <- inun_ts%>%
+  filter(river == "4-1")%>%
+  filter(restLoc == "4th" | restLoc == "unr")%>%
+  ggplot()+
+  geom_line(aes(percentRest, ti_hr, color = storm, group = storm))+
+  geom_point(aes(percentRest, ti_hr, color = storm))+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  labs(x = expression(atop("Percent 4"^th*"-order stream restored")),
+       y = element_blank(),
+       color = "Storm")+
+  ggtitle(expression("4"^th*"-order River"))
+
+
+ts_inun_1st+ts_inun_2nd+ts_inun_3rd+ts_inun_4th +
+   plot_layout(ncol = 4, guides = "collect")+
+             plot_annotation(title = 
+                               expression(atop('Floodplain Inundation Time due to Cumulative Restoration within the River')),
+                             tag_levels = 'A',
+                             theme = theme(title = element_text(size = 12, face = 2))) &
+   theme(text = element_text(size = 12)) 
+# &
+#   ylim(0,30)
+
+# &
+   # scale_y_continuous(trans=scales::pseudo_log_trans(base = 10))
+
+ggsave("Figures/inun_ts.png", dpi=500, width = 16, height = 4, units="in")
+```
+
+
+#moving plot- river 1-7, Q0.5, 1st-80p
+```{r}
+
+library(gganimate)
+library(gifski)
+library(gifski)
+library(transformr)
+        
+profile1 <- RAS_1stO %>%
+  group_by(STA)%>%
+  filter(plan == "1st-80p" & storm == "Q0.5" & river == "1-7")%>% 
+  mutate(
+    ordinate = case_when(day == "01SEP2008" & time == "0000" ~0,
+         TRUE~15))%>%
+  mutate(ordinate = cumsum(ordinate))%>%
+  mutate(
+    ti_min = case_when(wettedFPw >= 15 ~ 1,
+                       TRUE ~ 0))%>%
+  filter(ordinate<=300)
+
+profile1Plot <- profile1%>%
+  ggplot(aes(STA, ti_min))+
+  # geom_point(color = "blue")+
+  geom_line(aes(group = ordinate), color = "blue")+
+  scale_y_continuous(breaks=c(0,1))+
+  scale_x_reverse()+ 
+  theme(aspect.ratio=9/20)+
+  transition_time(ordinate) +
+  ggtitle("River 1-7, Q0.5, 1st-80p Floodplain inundation \n Minute: {round(frame_time)}")+
+  labs(x = "Distance Upstream (ft)", y = "Water in Floodplain (1 = yes)")
+
+
+animate(profile1Plot,
+        nframes = 21,
+        fps  = 1)
+anim_save("moving_1_7Q0.5_1st80p.gif")
+
+profile2 <- RAS_1stO %>%
+  group_by(STA)%>%
+  filter(plan == "1st-100p" & storm == "Q0.5" & river == "1-7")%>% 
+  mutate(
+    ordinate = case_when(day == "01SEP2008" & time == "0000" ~0,
+         TRUE~15))%>%
+  mutate(ordinate = cumsum(ordinate))%>%
+  mutate(
+    ti_min = case_when(wettedFPw >= 15 ~ 1,
+                       TRUE ~ 0))%>%
+  filter(ordinate<=300)
+
+profile2Plot <- profile2%>%
+  ggplot(aes(STA, ti_min))+
+  # geom_point(color = "blue")+
+  geom_line(aes(group = ordinate), color = "green")+
+  scale_y_continuous(breaks=c(0,1))+
+  scale_x_reverse()+
+  theme(aspect.ratio=9/20)+
+  transition_time(ordinate) +
+  ggtitle("River 1-7, Q0.5, 1st-100p Floodplain inundation  \n Minute: {round(frame_time)}")+
+  labs(x = "Distance Upstream (ft)", y = "Water in Floodplain (1 = yes)")
+
+
+animate(profile2Plot,
+        nframes = 21,
+        fps  = 1)
+anim_save("moving_1_7Q0.5_1st100p.gif")
+
+
+profile3 <- RAS_1stO %>%
+  group_by(STA)%>%
+  filter(plan == "1st-60p" & storm == "Q0.5" & river == "1-7")%>% 
+  mutate(
+    ordinate = case_when(day == "01SEP2008" & time == "0000" ~0,
+         TRUE~15))%>%
+  mutate(ordinate = cumsum(ordinate))%>%
+  mutate(
+    ti_min = case_when(wettedFPw >= 15 ~ 1,
+                       TRUE ~ 0))%>%
+  filter(ordinate<=300)
+
+profile3Plot <- profile3%>%
+  ggplot(aes(STA, ti_min))+
+  # geom_point(color = "blue")+
+  geom_line(aes(group = ordinate), color = "orange")+
+  scale_y_continuous(breaks=c(0,1))+
+  scale_x_reverse()+
+  theme(aspect.ratio=9/20)+
+  transition_time(ordinate) +
+  ggtitle("River 1-7, Q0.5, 1st-60p Floodplain inundation  \n Minute: {round(frame_time)}")+
+  labs(x = "Distance Upstream (ft)", y = "Water in Floodplain (1 = yes)")
+
+
+animate(profile3Plot,
+        nframes = 21,
+        fps  = 1)
+anim_save("moving_1_7Q0.5_1st60p.gif")
+
+profile4 <- RAS_1stO %>%
+  group_by(STA)%>%
+  filter(plan == "1st-100p" & storm == "Q1" & river == "1-7")%>% 
+  mutate(
+    ordinate = case_when(day == "01SEP2008" & time == "0000" ~0,
+         TRUE~15))%>%
+  mutate(ordinate = cumsum(ordinate))%>%
+  mutate(
+    ti_min = case_when(wettedFPw >= 15 ~ 1,
+                       TRUE ~ 0))%>%
+  filter(ordinate<=300)
+
+profile4Plot <- profile4%>%
+  ggplot(aes(STA, ti_min))+
+  # geom_point(color = "blue")+
+  geom_line(aes(group = ordinate), color = "black")+
+  scale_y_continuous(breaks=c(0,1))+
+  scale_x_reverse()+
+  theme(aspect.ratio=9/20)+
+  transition_time(ordinate) +
+  ggtitle("River 1-7, Q1, 1st-100p Floodplain inundation  \n Minute: {round(frame_time)}")+
+  labs(x = "Distance Upstream (ft)", y = "Water in Floodplain (1 = yes)")
+
+
+animate(profile4Plot,
+        nframes = 21,
+        fps  = 1)
+anim_save("moving_1_7Q1_1st100p.gif")
 ```
 
 #Removal load vs inundation time
@@ -226,24 +497,29 @@ inunVSrem <- bind_rows(inunVSrem1, inunVSrem2, inunVSrem3, inunVSrem4)%>%
   
 inunVSrem$storm <- factor(inunVSrem$storm,                 # Re-level group factor
                          levels = c("Q2", "Q1", "Q0.5", "Qm"))
-
-inunVSrem %>%
+test$storm <- factor(test$storm,                 # Re-level group factor
+                         levels = c("Q2", "Q1", "Q0.5", "Qm"))
+# inunVSrem %>%
+test%>%
   # filter(plan == "unr")%>%
-  filter(order ==  "1st-order rivers" | order ==  "2nd-order rivers")%>%
-  # filter(order ==  "3rd-order rivers" | order ==  "4th-order river")%>%
+  # filter(order ==  "1st-order rivers" | order ==  "2nd-order rivers")%>%
+  filter(order ==  "3rd-order rivers" | order ==  "4th-order river")%>%
   ggplot()+
-  geom_point(aes(ti_avg_hr, removal_scaled_kg, color = storm, shape = order))+
+  geom_point(aes(ti_hr, removal_scaled_kg, color = storm, shape = order))+
   # xlim(0,20)+
   # ylim(0,30)+
-  xlab("Average Inundation time (hrs)")+
+  xlab("Inundation time (hrs)")+
   # scale_x_log10()+
-  ylab(expression("NO"[3]*" Load Removed (kg)"))+
+  scale_y_continuous(
+    name = expression("Kilograms NO" [3]*" Removed (k" [m]*" rate)"),
+    # limits = c(0, 30),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= expression("Kilograms NO" [3]*" Removed (k" [90]*" rate)")))+
   labs(color = "Storm", shape = "Inundation Location")+
-  ggtitle(expression(atop("Inundation Time vs Nitrate Load Removed (k"[m]*" rate)")))+
+  ggtitle(expression(atop("Inundation Time vs Nitrate Load Removed")))+
   plot_annotation(theme = theme(title = element_text(size = 12, face = 2))) &
   theme(text = element_text(size = 10))
 
-# ggsave("Figures/timeAVGvsremoval_km.png", dpi=500, width = 7, height = 4, units="in")
+ggsave("Figures/3141restoreOnly_inun_ts_vsremoval.png", dpi=500, width = 7, height = 4, units="in")
 
 ```
 
@@ -513,7 +789,7 @@ ggsave("Figures/totInun_diagonal.png", dpi=500, height = 4, width = 16,  units="
 ```{r plot-wider, fig.width=16, fig.height=4}
 #calculating average inundation times in single rivers of different orders. Does not include XS that are never inundated.
 avg_inun <- bind_rows(inun_1stO, inun_2ndO, inun_3rdO, inun_4thO) %>%
-  filter(ti_tot_min > 0 )%>%
+  # filter(ti_tot_min > 0 )%>%
   group_by(storm, plan, river)%>%
   summarize(ti_avg_hr = mean(ti_tot_min)/60) %>% 
   mutate(percentRest = case_when(endsWith(plan, "100p")~ 100,
@@ -548,7 +824,7 @@ avg_inun_1st <- avg_inun%>%
   geom_point(aes(percentRest, ti_avg_hr, color = storm))+
   scale_x_continuous(breaks=seq(0,100,by=20))+
   xlab(expression(atop("Percent 1"^st*"-order streams restored")))+
-  ylab(expression(atop("Average Floodplain Inundation Time (hr)")))+
+  ylab(expression(atop("Average XS Inundation Time (hr)")))+
   ggtitle(expression("1"^st*"-order River"))
 
 avg_inun_2nd <- avg_inun%>%
@@ -592,7 +868,7 @@ avg_inun_1st+avg_inun_2nd+avg_inun_3rd+avg_inun_4th +
                              theme = theme(title = element_text(size = 12, face = 2))) &
   theme(text = element_text(size = 10))
 
-ggsave("Figures/avgInun_times.png", dpi=500, height = 4, width = 16,  units="in")
+ggsave("Figures/avgInun_timesAllXS.png", dpi=500, height = 4, width = 16,  units="in")
 ```
 
 
@@ -697,7 +973,8 @@ inunVSrem1 %>%
   scale_x_reverse()+
   labs(y = "Total Cross-sectional Inundation Time (min)", x = "XS Station (upstream to downstream from left to right)", color = "Storm")+
   ggtitle("Inundation Times Along a 1st-order Reach")
-ggsave("Figures/timeProfile17.png", dpi=500, width = 13, height = 4, units="in")
+# ggsave("Figures/timeProfile17.png", dpi=500, width = 13, height = 4, units="in")
+
 inunVSrem2 %>%
   # filter(storm == "Q1") %>%
   filter(river == "2-2" )%>%
@@ -707,7 +984,8 @@ inunVSrem2 %>%
   scale_x_reverse()+
   labs(y = "Total Cross-sectional Inundation Time (min)", x = "XS Station (upstream to downstream from left to right)", color = "Storm")+
   ggtitle("Inundation Times Along a 2nd-order Reach")
-ggsave("Figures/timeProfile22.png", dpi=500, width = 13, height = 4, units="in")
+# ggsave("Figures/timeProfile22.png", dpi=500, width = 13, height = 4, units="in")
+
 inunVSrem3 %>%
   # filtr(storm == "Q1") %>%
   filter(river == "3-1" )%>%
@@ -717,7 +995,8 @@ inunVSrem3 %>%
   scale_x_reverse()+
   labs(y = "Total Cross-sectional Inundation Time (min)", x = "XS Station (upstream to downstream from left to right)", color = "Storm")+
   ggtitle("Inundation Times Along a 3rd-order Reach")
-ggsave("Figures/timeProfile31.png", dpi=500, width = 13, height = 4, units="in")
+# ggsave("Figures/timeProfile31.png", dpi=500, width = 13, height = 4, units="in")
+
 inunVSrem4 %>%
   # filtr(storm == "Q1") %>%
   filter(river == "4-1" )%>%
@@ -727,7 +1006,7 @@ inunVSrem4 %>%
   scale_x_reverse()+
   labs(y = "Total Cross-sectional Inundation Time (min)", x = "XS Station (upstream to downstream from left to right)", color = "Storm")+
   ggtitle("Inundation Times Along the 4th-order Reach")
-ggsave("Figures/timeProfile41.png", dpi=500, width = 13, height = 4, units="in")
+# ggsave("Figures/timeProfile41.png", dpi=500, width = 13, height = 4, units="in")
 ```
 
 #inundation profiles, single storm 
@@ -754,6 +1033,76 @@ inunVSrem2 %>%
 
   
 ```
+#Calculating inundation time for full restoration the most recent way 09/28/23. Do this if have time or are asked.
+```{r}
+full_ti <- RAS_Full%>%
+  group_by(time, river, storm, plan)%>% 
+  mutate(
+    inun_ct = case_when(
+      wettedFPw >10 ~ 1, #giving a unit value to every timestep & XS 
+      TRUE~0))%>%
+  summarise(
+    inun_ct = sum(
+      inun_ct, na.rm = TRUE))%>% #represents the number of XS that are inundated at that timestep. I am just using this to show what time steps have water in them within the reach.
+  mutate(
+    inun_int = case_when( #assigning a 15-min interval to each timestep with water in FP
+      inun_ct >= 1~15, 
+      TRUE~0))%>%
+  group_by(storm, plan, river)%>%
+  summarise(
+    ti_hr = sum(inun_int)/60)%>% #value of inundation time in the reach for each plan and storm
+  mutate(PerShedRest = case_when(plan == "unr" ~ 0,
+                                 plan == "1st-20p" ~ 7, 
+                                 plan == "1st-40p" ~ 13,
+                                 plan == "1st-60p" ~ 20,
+                                 plan == "1st-80p" ~ 27,
+                                 plan == "1st-100p" ~ 34,
+                                 plan == "full-2nd-20p" ~ 38,
+                                 plan == "full-2nd-60p" ~ 48,
+                                 plan == "full-2nd-80p" ~ 52,
+                                 plan == "full-2nd-100p" ~ 57,
+                                 plan == "full-3rd-20p" ~ 61,
+                                 plan == "full-3rd-40p" ~ 65,
+                                 plan == "full-3rd-60p" ~ 69,
+                                 plan == "full-3rd-80p" ~ 72,
+                                 plan == "full-3rd-100p" ~ 76,
+                                 plan == "full-4th-20p" ~ 81,
+                                 plan == "full-4th-40p" ~ 86,
+                                 plan == "full-4th-60p" ~ 91,
+                                 plan == "full-4th-80p" ~ 95,
+                                 plan == "full-4th-100p" ~ 100))%>% 
+    mutate(plan = case_when(startsWith(plan, "full") ~ substring(plan,
+                                                               first = 6,
+                                                               last = nchar(plan)),
+                                                               TRUE ~ plan),
+         restLoc = 
+           case_when(startsWith(plan, "unr") ~ "1st-order rivers",
+                     startsWith(plan, "1st") ~ "1st-order rivers",
+                     startsWith(plan, "2nd") ~ "2nd-order rivers",
+                     startsWith(plan, "3rd") ~ "3rd-order rivers",
+                     startsWith(plan, "4th") ~ "4th-order river"))
+
+full_ti%>%
+ggplot()+
+  geom_line(aes(PerShedRest, ti_hr, color = storm, group = storm))+
+  geom_point(aes(PerShedRest, ti_hr, color = storm, shape = restLoc), size = 1)+
+  # facet_wrap( ~restLoc, scales = "free", ncol = 4)+
+  labs(x = expression(atop("Percent of the 4"^th*"-order Watershed Restored")), 
+       y = expression(atop("Average Inundation Time (hrs)")),
+       color = "Storm", 
+       shape = expression(atop("Location Cumulatively", "Restored Through")))+
+  scale_x_continuous(breaks=seq(0,100,by=20),  
+                     sec.axis = sec_axis(~.*130.454/100, 
+                                         name = "Watershed Length Restored [km]", 
+                                         breaks = seq(0,135,10)))+
+  ggtitle(expression(atop("Average Inundation Time Due to Full Restoration of the 4"^th*"-order Watershed")))+
+  theme(text = element_text(size = 8), 
+        title = element_text(size = 10),
+        legend.title = element_text(size=8),
+        legend.text = element_text(size=6),
+        axis.text.x = element_text(size=8))
+```
+
 
 #Full Restoration
 ```{r}
@@ -761,6 +1110,7 @@ inunVSrem2 %>%
 # test <- NO3_Full%>%
 #   filter(river == "4-1" & storm == "Q0.5" )%>%
 #   filter(plan == "3rd-60p"|plan == "3rd-80p"|plan == "3rd-100p")
+
 inunAnT_Full <- NO3_Full %>%
   filter(ti_tot_min > 0)%>%
    mutate(length_ft = 50,

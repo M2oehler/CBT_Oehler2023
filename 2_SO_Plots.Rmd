@@ -133,17 +133,19 @@ save(NO3_1stO, NO3_2ndO, NO3_3rdO, NO3_4thO,
 ```
 
 #4th order-watershed removal- cumulative
-```{r plot-wider, fig.width=10, fig.height=10}
-#1
+```{r plot-wider, fig.width=11, fig.height=10}
+#1 
 one <- NO3_1stO %>%
   filter(river == "1-7") %>%
   ggplot() +
   geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(expression(atop("%NO"[3]*"Removed", "U.S. of 1"^st*"-order outlets")))+
-  scale_x_continuous(breaks=seq(0,100,by=20))+
-  ylim(0,1)
+  scale_y_continuous(
+    name = expression(atop("%NO"[3]*"Removed U.S. ","of 1"^st*"-order outlets (k"[m]*")")),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20))
 #5
 five <- NO3_1stO %>%
   filter(river == "2-2") %>%
@@ -151,9 +153,11 @@ five <- NO3_1stO %>%
   geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(expression(atop("%NO"[3]*"Removed", "U.S. of 2"^nd*"-order outlets")))+
-  scale_x_continuous(breaks=seq(0,100,by=20))+
-  ylim(0,1)
+  scale_y_continuous(
+    name = expression(atop("%NO"[3]*"Removed U.S. ","of 2"^nd*"-order outlets (k"[m]*")")),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20))
 #9
 nine <- NO3_1stO %>%
   filter(river == "3-1") %>%
@@ -161,9 +165,11 @@ nine <- NO3_1stO %>%
   geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(expression(atop("%NO"[3]*"Removed", "U.S. of 3"^rd*"-order outlets")))+
-  scale_x_continuous(breaks=seq(0,100,by=20))+
-  ylim(0,1)
+  scale_y_continuous(
+    name = expression(atop("%NO"[3]*"Removed U.S. ","of 3"^rd*"-order outlets (k"[m]*")")),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20))
 #13
 thirteen <- NO3_1stO %>%
   filter(river == "4-1") %>%
@@ -171,9 +177,11 @@ thirteen <- NO3_1stO %>%
   geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.5)+
   xlab(expression(atop("Percent of 1"^st*"-Order", " Rivers Restored")))+
-  ylab(expression(atop("%NO"[3]*"Removed", "U.S. of 4"^th*"-order outlet")))+
-  scale_x_continuous(breaks=seq(0,100,by=20))+
-  ylim(0,1)
+  scale_y_continuous(
+    name = expression(atop("%NO"[3]*"Removed U.S. ","of 4"^th*"-order outlet (k"[m]*")")),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20))
 
 #2
 two <- NO3_2ndO %>%
@@ -182,9 +190,11 @@ two <- NO3_2ndO %>%
   geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(element_blank())+
-  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "Total Length of 2nd-order Rivers Restored [km]", breaks = seq(0,35,5)))+
-  ylim(0,1)
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = element_blank(), breaks = seq(0,35,5)))
 #6
 six <- NO3_2ndO %>%
   filter(river == "2-2") %>%
@@ -192,9 +202,12 @@ six <- NO3_2ndO %>%
   geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(element_blank())+
-  scale_x_continuous(breaks=seq(0,100,by=20))+
-  ylim(0,1)
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = element_blank(), breaks = seq(0,35,5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20))
 #10
 ten <- NO3_2ndO %>%
   filter(river == "3-1") %>%
@@ -202,9 +215,12 @@ ten <- NO3_2ndO %>%
   geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(element_blank())+
-  scale_x_continuous(breaks=seq(0,100,by=20))+
-  ylim(0,1)
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = element_blank(), breaks = seq(0,35,5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20))
 #14
 fourteen <- NO3_2ndO %>%
   filter(river == "4-1") %>%
@@ -212,9 +228,12 @@ fourteen <- NO3_2ndO %>%
   geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.5)+
   xlab(expression(atop("Percent of 2"^nd*"-Order", " Rivers Restored")))+
-  ylab(element_blank())+
-  scale_x_continuous(breaks=seq(0,100,by=20))+
-  ylim(0,1)
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = element_blank(), breaks = seq(0,35,5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20))
 
 #3
 three <- NO3_3rdO %>%
@@ -223,9 +242,12 @@ three <- NO3_3rdO %>%
   geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(element_blank())+
-  scale_x_continuous(breaks=seq(0,100,by=20))+
-  ylim(0,1)
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = element_blank(), breaks = seq(0,35,5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20))
 #7
 seven <- NO3_3rdO %>%
   filter(river == "2-2") %>%
@@ -233,9 +255,12 @@ seven <- NO3_3rdO %>%
   geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(element_blank())+
-  scale_x_continuous(breaks=seq(0,100,by=20))+
-  ylim(0,1)
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = element_blank(), breaks = seq(0,35,5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20))
 #11
 eleven <- NO3_3rdO %>%
   filter(river == "3-1") %>%
@@ -243,9 +268,12 @@ eleven <- NO3_3rdO %>%
   geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(element_blank())+
-  scale_x_continuous(breaks=seq(0,100,by=20))+
- ylim(0,1)
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = element_blank(), breaks = seq(0,35,5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20))
 #15
 fifteen <- NO3_3rdO %>%
   filter(river == "4-1") %>%
@@ -253,9 +281,12 @@ fifteen <- NO3_3rdO %>%
   geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.5)+
   xlab(expression(atop("Percent of 3"^rd*"-Order", " Rivers Restored")))+
-  ylab(element_blank())+
-  scale_x_continuous(breaks=seq(0,100,by=20))+
-  ylim(0,1)
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = element_blank(), breaks = seq(0,35,5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20))
 #4
 four <- NO3_4thO %>%
   filter(river == "1-7") %>%
@@ -263,9 +294,12 @@ four <- NO3_4thO %>%
   geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(element_blank())+
-  scale_x_continuous(breaks=seq(0,100,by=20))+
-  ylim(0,1)
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= expression(atop("%NO"[3]*" Removed U.S. ","of 1"^st*"-order outlets (k"[90]*")")), breaks = seq(0, 22, 5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = element_blank(), breaks = seq(0,35,5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20))
 #8
 eight <- NO3_4thO %>%
   filter(river == "2-2") %>%
@@ -273,8 +307,11 @@ eight <- NO3_4thO %>%
   geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(element_blank())+
-  ylim(0,1)+
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= expression(atop("%NO"[3]*" Removed U.S. ","of 2"^nd*"-order outlets (k"[90]*")")), breaks = seq(0, 22, 5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = element_blank(), breaks = seq(0,35,5)))
   scale_x_continuous(breaks=seq(0,100,by=20))
 #12
 twelve <- NO3_4thO %>%
@@ -283,9 +320,12 @@ twelve <- NO3_4thO %>%
   geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(element_blank())+
-  scale_x_continuous(breaks=seq(0,100,by=20))+
-  ylim(0,1)
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= expression(atop("%NO"[3]*" Removed U.S. ","of 3"^rd*"-order outlets (k"[90]*")")), breaks = seq(0, 22, 5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = element_blank(), breaks = seq(0,35,5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20))
 #16
 sixteen <- NO3_4thO %>%
   filter(river == "4-1") %>%
@@ -293,9 +333,12 @@ sixteen <- NO3_4thO %>%
   geom_line(aes(x = percentRest, y = km_PerCumRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_PerCumRem, color = storm), size = 0.5)+
   xlab(expression(atop("Percent of 4"^th*"-Order", "River Restored")))+
-  ylab(element_blank())+
-  scale_x_continuous(breaks=seq(0,100,by=20))+
-  ylim(0,1)
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= expression(atop("%NO"[3]*" Removed U.S. ","of 4"^th*"-order outlet (k"[90]*")")), breaks = seq(0, 22, 5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = element_blank(), breaks = seq(0,35,5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20))
 
 
 one+
@@ -316,11 +359,11 @@ four+
                      breaks = seq(0,35,5)))+
 five+six+seven+eight+nine+ten+eleven+twelve+thirteen+fourteen+fifteen+sixteen+
   plot_layout(ncol = 4, guides = "collect")+
-  plot_annotation(title = expression("Percent NO"[3]*" Removed from the Watershed Cumulatively (k"[m]*")"), 
+  plot_annotation(title = expression("Percent NO"[3]*" Removed from the Watershed Cumulatively by River Orders"), 
                   caption = "U.S.- Upstream",
                   theme = theme(title = element_text(size = 12, face = 2)))&
   theme(text = element_text(size = 10))
-  ggsave("Figures/SOmatrixWSL_km_uni.png", dpi=500,  units="in")
+  # ggsave("Figures/matrixCumu_2axis.png", dpi=500, width = 11, height = 10, units="in")
 ```
 
 ```{r}
@@ -1421,7 +1464,7 @@ ggsave("Exports/EngAddedBenefit_uni_km.png", dpi=500, height=5, width=5, units="
 
 ##unrestored removal baseline plot
 
-```{r plot-wider, fig.width=9, fig.height=4}
+```{r plot-wider, fig.width=6, fig.height=4}
 unr <- rbind(NO3_1stO, NO3_2ndO, NO3_3rdO, NO3_4thO)
 unr <- unr%>%
   filter(plan == "unr")%>%
@@ -1435,42 +1478,48 @@ baseline_km <- unr%>%
   ggplot()+
   geom_point(aes(Order, km_percentWLR, color = storm))+
   geom_line(aes(Order, km_percentWLR, group = storm, color = storm))+
-  ylim(0,0.15)+
-  xlab(element_blank())+
-  ylab(element_blank())+
-  ggtitle(expression(atop("k"[m])))
-
-baseline_k10 <- unr%>%
-  ggplot()+
-  geom_point(aes(Order, k10_percentWLR, color = storm))+
-  geom_line(aes(Order, k10_percentWLR, group = storm, color = storm))+
-  # ylim(0,0.015)+
-  xlab(element_blank())+
-  ylab("Percent of Total Watershed Load Removed")+
-  ggtitle(expression(atop("k"[10])))
-
-baseline_k90 <- unr%>%
-  ggplot()+
-  geom_point(aes(Order, k90_percentWLR, color = storm))+
-  geom_line(aes(Order, k90_percentWLR, group = storm, color = storm))+
-  ylim(0,3)+
-  xlab(element_blank())+
-  ylab(element_blank())+
-  ggtitle(expression(atop("k"[90])))
-
-baseline_k10+baseline_km+baseline_k90+ 
-  plot_layout(ncol = 3, guides = "collect")+
-            plot_annotation(title = expression(atop("Baseline NO"[3]*" Removal: Percent NO"[3]*" Removed from the Unrestored 4"^th*"-order Watershed")), 
-                            caption = expression("River Order Location of NO"[3]*" Removal"),
-                            theme = theme(title = element_text(size = 10, face = 2), plot.caption = element_text(hjust = 0.5)),
-                            tag_levels = 'A')&
+  xlab(expression("River Order Location of NO"[3]*" Removal"))+
+  scale_y_continuous(
+    name = expression(atop("Percent 4"^th*"-order Watershed Load Removed (k"[m]*")")),
+    limits = c(0, 0.15),
+    sec.axis = sec_axis( trans=~.*21.31146981, name=expression(atop("Percent 4"^th*"-order Watershed Load Removed (k"[90]*")"))))+
+  plot_annotation(title = expression(atop("Percent NO"[3]*" Removed from the Unrestored 4"^th*"-order Watershed"))) &
   theme(text = element_text(size = 8))
 
-ggsave("Figures/baselineRemoval.png", dpi=500, height = 4, width = 9, units="in")
+ggsave("Figures/baselineRemoval_doubleAxis.png", dpi=500, height = 4, width = 6, units="in")
+
+# baseline_k10 <- unr%>%
+#   ggplot()+
+#   geom_point(aes(Order, k10_percentWLR, color = storm))+
+#   geom_line(aes(Order, k10_percentWLR, group = storm, color = storm))+
+#   # ylim(0,0.015)+
+#   xlab(element_blank())+
+#   ylab("Percent of Total Watershed Load Removed")+
+#   ggtitle(expression(atop("k"[10])))
+
+# baseline_k90 <- unr%>%
+#   ggplot()+
+#   geom_point(aes(Order, k90_percentWLR, color = storm))+
+#   geom_line(aes(Order, k90_percentWLR, group = storm, color = storm))+
+#   ylim(0,3)+
+#   xlab(element_blank())+
+#   ylab(element_blank())+
+#   ggtitle(expression(atop("k"[90])))
+# 
+# baseline_k10+baseline_km+baseline_k90+ 
+#   plot_layout(ncol = 3, guides = "collect")+
+#             plot_annotation(title = expression(atop("Baseline NO"[3]*" Removal: Percent NO"[3]*" Removed from the Unrestored 4"^th*"-order Watershed")), 
+#                             caption = expression("River Order Location of NO"[3]*" Removal"),
+#                             theme = theme(title = element_text(size = 10, face = 2), plot.caption = element_text(hjust = 0.5)),
+#                             tag_levels = 'A')&
+#   theme(text = element_text(size = 8))
+
+# ggsave("Figures/baselineRemoval.png", dpi=500, height = 4, width = 9, units="in")
 ```
 
 ##Baseline removal in different watershed sizes within the 4th-order
 ```{r}
+#load monitorSO datafram from saved dataframes folder
 unr_monitor <- monitorSO%>%
   filter(plan == "unr")%>%
   mutate(Order = case_when(river == "1-7"~"1st-order",
@@ -1486,9 +1535,14 @@ unr_monitor%>%
   geom_line(aes(Order, km_pRem, group = storm, color = storm))+
   # ylim(0,0.15)+
   xlab("Watershed Order")+
-  ylab(expression("Percent Watershed NO"[3]*"Load Removed"))+
-  ggtitle(expression(atop("Baseline NO"[3]*" Removal:", "Percent NO"[3]*" Removed by Watershed Size (k"[m]*")")))
-ggsave("Figures/baselineMonitor.png", dpi=500, height = 3, width = 6, units="in")
+  scale_y_continuous(
+    name = expression(atop("Percent Watershed Load Removed (k"[m]*")")),
+    limits = c(0, 0.2),
+    sec.axis = sec_axis( trans=~.*21.31146981, name=expression(atop("Percent Watershed Load Removed (k"[90]*")"))))+
+  plot_annotation(title = expression(atop("Percent NO"[3]*" Load Removed from different Watershed Orders"))) &
+  theme(text = element_text(size = 8))
+
+ggsave("Figures/baselineMonitor_doubleaxis.png", dpi=500, height = 3, width = 6, units="in")
 # baseline_k10 <- unr_monitor%>%
 #   ggplot()+
 #   geom_point(aes(Order, km_pRem, color = storm))+
@@ -1822,7 +1876,10 @@ one <- monitorSO %>%
   geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(expression(atop("%NO"[3]*" Removed from", "a 1"^st*"-order Watershed")))+
+  scale_y_continuous(
+    name = expression(atop("%NO"[3]*" Removed from a","1"^st*"-order Watershed (k"[m]*")")),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
   scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "Tot Length of 1st-order\n Rivers Restored [km]", breaks = seq(0,50,10)))
 #5
 five <-  monitorSO %>%
@@ -1832,7 +1889,10 @@ five <-  monitorSO %>%
   geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(expression(atop("%NO"[3]*" Removed from", "a 2"^nd*"-order Watershed")))+
+  scale_y_continuous(
+    name = expression(atop("%NO"[3]*" Removed from a","2"^nd*"-order Watershed (k"[m]*")")),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
   scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "", breaks = seq(0,50,10)))
 #9
 nine <-  monitorSO %>%
@@ -1842,7 +1902,10 @@ nine <-  monitorSO %>%
   geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(expression(atop("%NO"[3]*" Removed from", "a 3"^rd*"-order Watershed")))+
+  scale_y_continuous(
+    name = expression(atop("%NO"[3]*" Removed from a","3"^rd*"-order Watershed (k"[m]*")")),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
   scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "", breaks = seq(0,50,10)))
 #13
 thirteen <-  monitorSO %>%
@@ -1851,8 +1914,11 @@ thirteen <-  monitorSO %>%
   ggplot() +
   geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.5)+
-  xlab(expression(atop("Percent of 1"^st*"-Order", "Rivers Restored")))+
-  ylab(expression(atop("%NO"[3]*" Removed from", "the 4"^th*"-order Watershed")))+
+  xlab(expression(atop("Percent of 1"^st*"-Order", "River(s) Restored")))+
+  scale_y_continuous(
+    name = expression(atop("%NO"[3]*" Removed from the","4"^th*"-order Watershed (k"[m]*")")),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
   scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.43891, name = "", breaks = seq(0,50,10)))
 
 
@@ -1864,7 +1930,10 @@ two <- monitorSO %>%
   geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(element_blank())+
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
   scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "Tot Length of 2nd-order\n Rivers Restored [km]", breaks = seq(0,35,5)))
 #6
 six <- monitorSO %>%
@@ -1874,7 +1943,10 @@ six <- monitorSO %>%
   geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(element_blank())+
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
   scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "", breaks = seq(0,35,5)))
 #10
 ten <- monitorSO %>%
@@ -1884,7 +1956,10 @@ ten <- monitorSO %>%
   geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(element_blank())+
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
   scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "", breaks = seq(0,35,5)))
 #14
 fourteen <- monitorSO %>%
@@ -1893,8 +1968,11 @@ fourteen <- monitorSO %>%
   ggplot() +
   geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.5)+
-  xlab(expression(atop("Percent of 2"^nd*"-Order", " Rivers Restored")))+
-  ylab(element_blank())+
+  xlab(expression(atop("Percent of 2"^nd*"-Order", " River(s) Restored")))+
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
   scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30175, name = "", breaks = seq(0,35,5)))
 
 #3
@@ -1905,7 +1983,10 @@ three <- monitorSO %>%
   geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(element_blank())+
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
   scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "Tot Length of 3rd-order\n Rivers Restored [km]", breaks = seq(0,30,5)))
 #7
 seven <- monitorSO %>%
@@ -1915,7 +1996,10 @@ seven <- monitorSO %>%
   geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(element_blank())+
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
   scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "", breaks = seq(0,30,5)))
 #11
 eleven <- monitorSO %>%
@@ -1925,7 +2009,10 @@ eleven <- monitorSO %>%
   geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(element_blank())+
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
   scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "", breaks = seq(0,30,5)))
 #15
 fifteen <- monitorSO %>%
@@ -1934,8 +2021,11 @@ fifteen <- monitorSO %>%
   ggplot() +
   geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.5)+
-  xlab(expression(atop("Percent of 3"^rd*"-Order", " Rivers Restored")))+
-  ylab(element_blank())+
+  xlab(expression(atop("Percent of 3"^rd*"-Order", " River(s) Restored")))+
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= element_blank(), breaks = seq(0, 22, 5)))+
   scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.25603, name = "", breaks = seq(0,30,5)))
 
 #4
@@ -1946,7 +2036,10 @@ four <- monitorSO %>%
   geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(element_blank())+
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= expression(atop("%NO"[3]*" Removed from a","1"^st*"-order Watershed (k"[90]*")")), breaks = seq(0, 22, 5)))+
   scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "Tot Length of 4th-order\n River Restored [km]", breaks = seq(0,35,5)))
 #8
 eight <- monitorSO %>%
@@ -1956,7 +2049,10 @@ eight <- monitorSO %>%
   geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(element_blank())+
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= expression(atop("%NO"[3]*" Removed from a","2"^nd*"-order Watershed (k"[90]*")")), breaks = seq(0, 22, 5)))+
   scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "", breaks = seq(0,35,5)))
 #12
 twelve <- monitorSO %>%
@@ -1966,7 +2062,10 @@ twelve <- monitorSO %>%
   geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.5)+
   xlab(element_blank())+
-  ylab(element_blank())+
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= expression(atop("%NO"[3]*" Removed from a","3"^rd*"-order Watershed (k"[90]*")")), breaks = seq(0, 22, 5)))+
   scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "", breaks = seq(0,35,5)))
 #16
 sixteen <- monitorSO %>%
@@ -1976,18 +2075,20 @@ sixteen <- monitorSO %>%
   geom_line(aes(x = percentRest, y = km_pRem, color = storm), linewidth = 0.8)+
   geom_point(aes(x = percentRest, y = km_pRem, color = storm), size = 0.5)+
   xlab(expression(atop("Percent of 4"^th*"-Order", " River Restored")))+
-  ylab(element_blank())+
+  scale_y_continuous(
+    name = element_blank(),
+    limits = c(0, 1),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= expression(atop("%NO"[3]*" Removed from the","4"^th*"-order Watershed (k"[90]*")")), breaks = seq(0, 22, 5)))+
   scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~. * 0.30785, name = "", breaks = seq(0,35,5)))
 
 one+two+three+four+five+six+seven+eight+nine+ten+eleven+twelve+thirteen+fourteen+fifteen+sixteen+
   plot_layout(ncol = 4, guides = "collect")+
   plot_annotation(title = expression("%NO"[3]*" Load Removed by Watershed Order"), 
-                  subtitle = "Median removal rate, 1mgL background concentration ",
+                  subtitle = expression("1mgL NO"[3]*" background concentration"),
                   theme = theme(title = element_text(size = 12, face = 2))) &
-   ylim(0,1) &
   theme(text = element_text(size = 10))
 
-ggsave("Figures/monitoring_km_uni.png", dpi=500, units="in")
+ggsave("Figures/Matrix_watershedOrder_2axis.png", dpi=500, height = 10, width = 11, units="in")
 ```
 
 #k90

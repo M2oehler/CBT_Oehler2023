@@ -509,39 +509,42 @@ NO3_km$Restoration_Location <- factor(NO3_km$Restoration_Location,              
             
 ```
 
-```{r plot-wider, fig.width=12, fig.height=4}
+```{r plot-wider, fig.width=7, fig.height=5}
 plot_Kmkm <- NO3_km %>%
   group_by(storm,plan, RestPathLoc_Km, Restoration_Location)%>%
   summarise(km_percentWLR = sum(km_percentWLR))%>%
   ggplot()+
   geom_line((aes(RestPathLoc_Km, km_percentWLR, color = storm, group = storm)))+
   geom_point(aes(RestPathLoc_Km, km_percentWLR,color = storm, shape = Restoration_Location))+
-  xlab(element_blank())+
-  ylab(element_blank())+
-  ggtitle(expression("k"[m]))+
+  xlab(expression("Location of 1km restoration", "along the flowpath (km)"))+
+  scale_y_continuous(
+    name = expression("Percent 4"^th*"-order Watershed Load Removed (k"[m]*"rate)"),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= expression("Percent 4"^th*"-order Watershed Load Removed (k"[90]*"rate)")))+
+  labs(color = "Storm", shape = "Areal Location")+
+  ggtitle(expression(atop("Percent 4"^th*"-order Watershed NO"[3]*" Removed", "with 1 km Length Restoration Implemented")))+
   theme(legend.spacing.y = unit(0.2, 'cm'))
 
-plot_Kmk90 <- NO3_km %>%
-  group_by(storm, plan, RestPathLoc_Km, Restoration_Location)%>%
-  summarise(k90_percentWLR = sum(k90_percentWLR))%>%
-  ggplot()+
-  geom_line(aes(RestPathLoc_Km, k90_percentWLR, color = storm, group = storm))+
-  geom_point(aes(RestPathLoc_Km, k90_percentWLR, color = storm, shape = Restoration_Location))+
-  xlab(element_blank())+
-  ylab(element_blank())+
-  ggtitle(expression("k"[90]))+
-  theme(legend.spacing.y = unit(0.2, 'cm'))
-
-plot_Kmk10 <- NO3_km %>%
-  group_by(storm,plan, RestPathLoc_Km, Restoration_Location)%>%
-  summarise(k10_percentWLR = sum(k10_percentWLR))%>%
-  ggplot()+
-  geom_line(aes(RestPathLoc_Km, k10_percentWLR, color = storm, group = storm))+
-  geom_point(aes(RestPathLoc_Km, k10_percentWLR, color = storm, shape = Restoration_Location))+
-  xlab(element_blank())+
-  ylab("Percent of Total Watershed Load Removed")+
-  ggtitle(expression("k"[10]))+
-  theme(legend.spacing.y = unit(0.2, 'cm'))
+# plot_Kmk90 <- NO3_km %>%
+#   group_by(storm, plan, RestPathLoc_Km, Restoration_Location)%>%
+#   summarise(k90_percentWLR = sum(k90_percentWLR))%>%
+#   ggplot()+
+#   geom_line(aes(RestPathLoc_Km, k90_percentWLR, color = storm, group = storm))+
+#   geom_point(aes(RestPathLoc_Km, k90_percentWLR, color = storm, shape = Restoration_Location))+
+#   xlab(element_blank())+
+#   ylab(element_blank())+
+#   ggtitle(expression("k"[90]))+
+#   theme(legend.spacing.y = unit(0.2, 'cm'))
+# 
+# plot_Kmk10 <- NO3_km %>%
+#   group_by(storm,plan, RestPathLoc_Km, Restoration_Location)%>%
+#   summarise(k10_percentWLR = sum(k10_percentWLR))%>%
+#   ggplot()+
+#   geom_line(aes(RestPathLoc_Km, k10_percentWLR, color = storm, group = storm))+
+#   geom_point(aes(RestPathLoc_Km, k10_percentWLR, color = storm, shape = Restoration_Location))+
+#   xlab(element_blank())+
+#   ylab("Percent of Total Watershed Load Removed")+
+#   ggtitle(expression("k"[10]))+
+#   theme(legend.spacing.y = unit(0.2, 'cm'))
 
 plot_Kmk10 + theme(text = element_text(size = 7)) + plot_Kmkm + theme(text = element_text(size = 7)) +
   plot_Kmk90 + theme(text = element_text(size = 7)) +
@@ -552,7 +555,7 @@ plot_Kmk10 + theme(text = element_text(size = 7)) + plot_Kmkm + theme(text = ele
 theme(text = element_text(size = 10))
 
 
-ggsave("Figures/1km.png", dpi=500)
+ggsave("Figures/1km_2axis.png", width = 7, height = 5, dpi=500)
 ```
 
 #% benefit of 1 km restoration projects compared to unrestored conditions

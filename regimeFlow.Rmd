@@ -1,0 +1,1006 @@
+---
+title: "Gwynns Hydrograph"
+output: html_document
+date: "2023-09-07"
+---
+#Housekeeping
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+library(dataRetrieval)
+library(EGRET)
+library(tidyverse)
+theme_set(theme_classic())
+vignette("dataRetrieval", package = "dataRetrieval")
+```
+
+#Gages in Dead Run
+```{r}
+#streamstats gages
+deadRun_gages <- data.frame(site_no = c("01589312", "01589315", "01589316", "01589317", "01589320"))
+
+#selecting data from the gwynns gages out of all the MD gages. whatNWISdata includes start and end dates.
+deadRun_Q <- whatNWISdata(stateCd = "MD", 
+                          parameterCd = "00060")%>% 
+  filter(site_no %in% c("01589312", "01589315", "01589316", "01589317", "01589320"))%>%
+  select(site_no, begin_date, end_date)
+deadRun_Q <- deadRun_Q[!duplicated(deadRun_Q$site_no), ] #deleting duplicate gages
+
+#Getting more data on gwynns gages. readNWISsite includes drainage area.
+deadRun_gageinfo <- readNWISsite(deadRun_gages$site_no)%>%
+  select(site_no:drain_area_va)
+
+Q_deadCatonsville <- readNWISuv("01589312", c("00060"),  "2008-10-01T00:00","2018-09-30T23:59")%>%
+  renameNWISColumns()%>% 
+  rename(Date = "dateTime", Q = "Flow_Inst")
+
+Q_deadWoodlawn <- readNWISuv("01589315", c("00060"),  "2008-10-01T00:00","2018-09-30T23:59")%>%
+  renameNWISColumns()%>% 
+  rename(Date = "dateTime", Q = "Flow_Inst")
+
+Q_deadWoodlawnTrib <- readNWISuv("01589320", c("00060"),  "2008-10-01T00:00","2018-09-30T23:59")%>%
+  renameNWISColumns()%>% 
+  rename(Date = "dateTime", Q = "Flow_Inst")
+
+Q_deadNearWoodlawn <- readNWISuv("01589316", c("00060"),  "2008-10-01T00:00","2018-09-30T23:59")%>%
+  renameNWISColumns()%>% 
+  rename(Date = "dateTime", Q = "Flow_Inst")
+
+Q_deadAtWoodlawn <- readNWISuv("01589317", c("00060"),  "2008-10-01T00:00","2018-09-30T23:59")%>%
+  renameNWISColumns()%>% 
+  rename(Date = "dateTime", Q = "Flow_Inst")
+
+```
+
+
+#flow gages in Gwynns's Falls
+```{r plot-wider, fig.width=15, fig.height=7}
+#streamstats gages
+sites_yrData <- data.frame(site_no = c("01589180", "01589197", "01589200", "01589230", "01589238","01589290", "01589300", "01589305", "01589330", "01589351","0158935180", "01589352",
+                                       "01589312", "01589315","01589320","01589316","01589317"))
+
+#selecting data from the gwynns gages out of all the MD gages. whatNWISdata includes start and end dates.
+MD_Q_gages <- whatNWISdata(stateCd = "MD", 
+                          parameterCd = "00060")%>% 
+  filter(site_no %in% c("01589180", "01589197", "01589200", "01589230", "01589238", "01589290", "01589300",
+                        "01589305", "01589330", "01589351", "01589351", "0158935180", "01589352",
+                                       "01589312", "01589315","01589320","01589316","01589317"))%>%
+  select(site_no, begin_date, end_date)
+MD_Q_gages <- MD_Q_gages[!duplicated(MD_Q_gages$site_no), ] #deleting duplicate gages
+
+#Getting more data on gwynns gages. readNWISsite includes drainage area.
+Qsite_info <- readNWISsite(sites_yrData$site_no)%>%
+  select(site_no:drain_area_va)
+
+#Combining datasets
+gwynnGage_info <- full_join(MD_Q_gages, Qsite_info, by = "site_no")%>%
+  select(site_no, station_nm, dec_lat_va, dec_long_va, drain_area_va, begin_date, end_date)
+
+# ?readNWISsite
+library(ggplot2)
+library(ggsn)
+library(sf)
+library(dplyr)
+
+#converts US map to a sf object so can be plotted filters to MD and VA:
+usa <- st_as_sf(maps::map("state", fill=TRUE, plot =FALSE), #uses map function to grab us states
+                  crs = 4269)%>%
+  filter(ID == "maryland")
+
+#converts gage coordinates to an sf object:
+sf_md <- st_as_sf(Qsite_info, 
+                  coords = c("dec_long_va", "dec_lat_va"),
+                  crs = 4269)
+ggplot() +
+    geom_sf(data = usa[ usa$ID,]) + #plots MD polygons
+    geom_sf(data = sf_md, aes(color = sf_md$station_nm), size = 5) +
+    labs(color = "Gage Name")+
+    theme(legend.title = element_text(size = 5), 
+               legend.text = element_text(size = 5))+
+    xlab(NULL)+
+    ylab(NULL)+
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    north(sf_md, symbol=10, location="bottomleft") +
+    scalebar(usa[ "maryland" ,],
+             dist=100, dist_unit="mi", st.size = 3,
+             transform=TRUE, model="WGS84")
+
+
+```
+
+
+```{r}
+#  plot-wider, fig.width=10, fig.height=15
+#Would've done this all in one DF but I cant use the same date range for all the gages. I will use 2005-2015 for most
+Q_glyndon <- readNWISuv("01589180", c("00060"),  "2005-10-01T00:00","2015-09-30T23:59")%>%
+  renameNWISColumns()%>% 
+  rename(Date = "dateTime", Q = "Flow_Inst")
+
+Q_delight <- readNWISuv("01589197", c("00060"),  "2005-10-01T00:00","2015-09-30T23:59")%>%
+  renameNWISColumns()%>% 
+  rename(Date = "dateTime", Q = "Flow_Inst")
+
+Q_redRun <- readNWISuv("01589230", c("00060"),  "","")%>%
+  renameNWISColumns() %>% 
+  rename(Date = "dateTime", Q = "Flow_Inst")#Only ~4 yr data
+
+Q_mcdonogh <- readNWISuv("01589238", c("00060"), "2005-10-01T00:00","2015-09-30T23:59")%>%
+  renameNWISColumns()%>% 
+  rename(Date = "dateTime", Q = "Flow_Inst")
+
+Q_scotts <- readNWISuv("01589290", c("00060"),  "2005-10-01T00:00","2015-09-30T23:59")%>%
+  renameNWISColumns()%>% 
+  rename(Date = "dateTime", Q = "Flow_Inst")
+
+Q_villaNova <- readNWISuv("01589300", c("00060"),  "2005-10-01T00:00","2015-09-30T23:59")%>%
+  renameNWISColumns()%>% 
+  rename(Date = "dateTime", Q = "Flow_Inst")
+
+Q_powderMill <- readNWISuv("01589305", c("00060"), "2006-10-01T00:00","2016-09-30T23:59")%>%
+  renameNWISColumns()%>% 
+  rename(Date = "dateTime", Q = "Flow_Inst")
+
+Q_deadRun <- readNWISuv("01589330", c("00060"),  "2005-10-01T00:00","2015-09-30T23:59")%>%
+  renameNWISColumns()%>% 
+  rename(Date = "dateTime", Q = "Flow_Inst")
+
+Q_gwynnRun <- readNWISuv("0158935180", c("00060"), "","")%>%
+  renameNWISColumns()%>% 
+  rename(Date = "dateTime", Q = "Flow_Inst")#no data for mean depth of stream for 00064, 72178.Only ~4 yr data
+
+Q_gwynOutlet <- readNWISuv("01589352", c("00060"),  "2005-10-01T00:00","2015-09-30T23:59")%>%
+  renameNWISColumns()%>% 
+  rename(Date = "dateTime", Q = "Flow_Inst")
+
+Q_owings <- readNWISdv("01589200", c("00060"),  "1960-10-01","1970-09-30")%>%
+  renameNWISColumns()%>% 
+  rename(Q = "Flow")
+
+Q_maiden <- readNWISdv("01589351", c("00060"),  "","")%>%
+  renameNWISColumns()%>% 
+  rename(Q = "Flow") #Only ~4 yr data
+
+Q_allSites <- bind_rows(Q_glyndon, Q_delight, Q_redRun, Q_mcdonogh, 
+                        Q_scotts, Q_villaNova, Q_powderMill, Q_deadRun, 
+                        Q_gwynnRun,  Q_gwynOutlet, Q_owings, Q_maiden,
+                        Q_deadCatonsville, Q_deadWoodlawn, Q_deadWoodlawnTrib, Q_deadNearWoodlawn, Q_deadAtWoodlawn)%>%
+  group_by(site_no)
+
+colnames(Q_allSites)[3] ="Date"
+colnames(Q_allSites)[4] ="Q"
+
+#does not appear to be any large gaps in datasets
+Q_allSites%>%
+  filter(site_no == "01589352")%>%
+  filter(Date > ymd_hms("2013-12-23 00:00:00")& Date < ymd_hms("2013-12-25 00:00:00"))%>%
+  ggplot()+
+  geom_line(aes(x = Date, y = Q))+
+  # facet_wrap(~site_no, nrow = 9, scales = "free",
+  #            strip.position = "left")+
+  labs(x = "Date/Time", y = "Q (cfs)")
+
+test <- Q_allSites%>%
+  filter(site_no == "01589352")%>%
+  filter(Date > ymd_hms("2013-12-23 00:00:00")& Date < ymd_hms("2013-12-25 00:00:00"))
+write.csv(test, "GwynnsOutletGageQmEX.csv")
+
+save(Q_allSites,Q_glyndon, Q_delight, Q_redRun, Q_mcdonogh, 
+                        Q_scotts, Q_villaNova, Q_powderMill, Q_deadRun, 
+                        Q_gwynnRun,  Q_gwynOutlet, 
+                        Q_deadCatonsville, Q_deadWoodlawn, Q_deadWoodlawnTrib, Q_deadNearWoodlawn, Q_deadAtWoodlawn,
+     file = "C:/Users/morganao/Documents/CBT_Oehler2023/12_Saved_Dataframes/GwynnsGages_timeseries.RData")
+```
+
+#Carlys partial duration method using Gwynns gages
+##(1)Recurrence interval peak flows
+```{r}
+library(hydrostats)
+#Keep defaults other than average return interval (ari). Ex: ari = 1 is the annual exceedence series
+
+#monthly
+peakQ_glyndon <- Q_glyndon %>% partial.series(ari = 0.083, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_glyndon$site_no[1], 
+         ari = "Qm")
+
+peakQ_delight <-Q_delight %>% partial.series(ari = 0.083, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_delight$site_no[1], 
+         ari = "Qm")
+
+peakQ_redRun <- Q_redRun %>% partial.series(ari = 0.083, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_redRun$site_no[1], 
+         ari = "Qm")
+
+peakQ_mcdonogh <-Q_mcdonogh %>% partial.series(ari = 0.083, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_mcdonogh$site_no[1], 
+         ari = "Qm")
+
+peakQ_scotts <- Q_scotts %>% partial.series(ari = 0.083, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_scotts$site_no[1], 
+         ari = "Qm")
+
+peakQ_villaNova <- Q_villaNova %>% partial.series(ari = 0.083, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_villaNova$site_no[1], 
+         ari = "Qm")
+
+peakQ_powderMill <- Q_powderMill %>% partial.series(ari = 0.083, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_powderMill$site_no[1], 
+         ari = "Qm")
+
+peakQ_deadRun <- Q_deadRun %>% partial.series(ari = 0.083, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadRun$site_no[1], 
+         ari = "Qm")
+
+peakQ_gwynnRun <- Q_gwynnRun %>% partial.series(ari = 0.083, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_gwynnRun$site_no[1], 
+         ari = "Qm")
+
+peakQ_gwynOutlet <- Q_gwynOutlet %>% partial.series(ari = 0.083, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_gwynOutlet$site_no[1], 
+         ari = "Qm")
+
+peakQ_owings <- Q_owings %>% partial.series(ari = 0.083, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_owings$site_no[1], 
+         ari = "Qm")
+
+peakQ_maiden <- Q_maiden %>% partial.series(ari = 0.083, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_maiden$site_no[1], 
+         ari = "Qm")
+
+peakQ_deadCatonsville <- Q_deadCatonsville %>% partial.series(ari = 0.083, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadCatonsville$site_no[1], 
+         ari = "Qm")
+
+peakQ_deadWoodlawn <- Q_deadWoodlawn %>% partial.series(ari = 0.083, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadWoodlawn$site_no[1], 
+         ari = "Qm") 
+
+peakQ_deadWoodlawnTrib <- Q_deadWoodlawnTrib %>% partial.series(ari = 0.083, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadWoodlawnTrib$site_no[1], 
+         ari = "Qm")
+
+peakQ_deadNearWoodlawn<- Q_deadNearWoodlawn %>% partial.series(ari = 0.083, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadNearWoodlawn$site_no[1], 
+         ari = "Qm")
+
+peakQ_deadAtWoodlawn<- Q_deadAtWoodlawn %>% partial.series(ari = 0.083, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadAtWoodlawn$site_no[1], 
+         ari = "Qm")
+
+#combine monthly storms to 1 dataframe
+peakQ_allSites <- bind_rows(peakQ_glyndon, peakQ_delight, peakQ_redRun, peakQ_mcdonogh, 
+                        peakQ_scotts, peakQ_villaNova, peakQ_powderMill, peakQ_deadRun, 
+                        peakQ_gwynnRun,  peakQ_gwynOutlet, peakQ_owings, peakQ_maiden,
+                        peakQ_deadCatonsville, peakQ_deadWoodlawn, peakQ_deadWoodlawnTrib, peakQ_deadNearWoodlawn, peakQ_deadAtWoodlawn)
+
+
+
+#half year
+peakQ_glyndon <- Q_glyndon %>% partial.series(ari = 0.5, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_glyndon$site_no[1], 
+         ari = "Q0.5")
+
+peakQ_delight <-Q_delight %>% partial.series(ari = 0.5, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_delight$site_no[1], 
+         ari = "Q0.5")
+
+peakQ_redRun <- Q_redRun %>% partial.series(ari = 0.5, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_redRun$site_no[1], 
+         ari = "Q0.5")
+
+peakQ_mcdonogh <-Q_mcdonogh %>% partial.series(ari = 0.5, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_mcdonogh$site_no[1], 
+         ari = "Q0.5")
+
+peakQ_scotts <- Q_scotts %>% partial.series(ari = 0.5, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_scotts$site_no[1], 
+         ari = "Q0.5")
+
+peakQ_villaNova <- Q_villaNova %>% partial.series(ari = 0.5, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_villaNova$site_no[1], 
+         ari = "Q0.5")
+
+peakQ_powderMill <- Q_powderMill %>% partial.series(ari = 0.5, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_powderMill$site_no[1], 
+         ari = "Q0.5")
+
+peakQ_deadRun <- Q_deadRun %>% partial.series(ari = 0.5, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadRun$site_no[1], 
+         ari = "Q0.5")
+
+peakQ_gwynnRun <- Q_gwynnRun %>% partial.series(ari = 0.5, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_gwynnRun$site_no[1], 
+         ari = "Q0.5")
+
+peakQ_gwynOutlet <- Q_gwynOutlet %>% partial.series(ari = 0.5, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_gwynOutlet$site_no[1], 
+         ari = "Q0.5")
+
+peakQ_owings <- Q_owings %>% partial.series(ari = 0.5, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_owings$site_no[1], 
+         ari = "Q0.5")
+
+peakQ_maiden <- Q_maiden %>% partial.series(ari = 0.5, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_maiden$site_no[1], 
+         ari = "Q0.5")
+
+peakQ_deadCatonsville <- Q_deadCatonsville %>% partial.series(ari = 0.5, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadCatonsville$site_no[1], 
+         ari = "Q0.5")
+
+peakQ_deadWoodlawn <- Q_deadWoodlawn %>% partial.series(ari = 0.5, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadWoodlawn$site_no[1], 
+         ari = "Q0.5") 
+
+peakQ_deadWoodlawnTrib <- Q_deadWoodlawnTrib %>% partial.series(ari = 0.5, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadWoodlawnTrib$site_no[1], 
+         ari = "Q0.5")
+
+peakQ_deadNearWoodlawn<- Q_deadNearWoodlawn %>% partial.series(ari = 0.5, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadNearWoodlawn$site_no[1], 
+         ari = "Q0.5")
+
+peakQ_deadAtWoodlawn<- Q_deadAtWoodlawn %>% partial.series(ari = 0.5, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadAtWoodlawn$site_no[1], 
+         ari = "Q0.5")
+
+peakQ_allSites <- bind_rows(peakQ_allSites, peakQ_glyndon, peakQ_delight, peakQ_redRun, peakQ_mcdonogh, 
+                        peakQ_scotts, peakQ_villaNova, peakQ_powderMill, peakQ_deadRun, 
+                        peakQ_gwynnRun,  peakQ_gwynOutlet, peakQ_owings, peakQ_maiden,
+                        peakQ_deadCatonsville, peakQ_deadWoodlawn, peakQ_deadWoodlawnTrib, peakQ_deadNearWoodlawn, peakQ_deadAtWoodlawn)
+
+#1-year
+peakQ_glyndon <- Q_glyndon %>% partial.series(ari = 1, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_glyndon$site_no[1], 
+         ari = "Q1")
+
+peakQ_delight <-Q_delight %>% partial.series(ari = 1, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_delight$site_no[1], 
+         ari = "Q1")
+
+peakQ_redRun <- Q_redRun %>% partial.series(ari = 1, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_redRun$site_no[1], 
+         ari = "Q1")
+
+peakQ_mcdonogh <-Q_mcdonogh %>% partial.series(ari = 1, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_mcdonogh$site_no[1], 
+         ari = "Q1")
+
+peakQ_scotts <- Q_scotts %>% partial.series(ari = 1, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_scotts$site_no[1], 
+         ari = "Q1")
+
+peakQ_villaNova <- Q_villaNova %>% partial.series(ari = 1, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_villaNova$site_no[1], 
+         ari = "Q1")
+
+peakQ_powderMill <- Q_powderMill %>% partial.series(ari = 1, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_powderMill$site_no[1], 
+         ari = "Q1")
+
+peakQ_deadRun <- Q_deadRun %>% partial.series(ari = 1, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadRun$site_no[1], 
+         ari = "Q1")
+
+peakQ_gwynnRun <- Q_gwynnRun %>% partial.series(ari = 1, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_gwynnRun$site_no[1], 
+         ari = "Q1")
+
+peakQ_gwynOutlet <- Q_gwynOutlet %>% partial.series(ari = 1, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_gwynOutlet$site_no[1], 
+         ari = "Q1")
+
+peakQ_owings <- Q_owings %>% partial.series(ari = 1, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_owings$site_no[1], 
+         ari = "Q1")
+
+peakQ_maiden <- Q_maiden %>% partial.series(ari = 1, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_maiden$site_no[1], 
+         ari = "Q1")
+
+peakQ_deadCatonsville <- Q_deadCatonsville %>% partial.series(ari = 1, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadCatonsville$site_no[1], 
+         ari = "Q1")
+
+peakQ_deadWoodlawn <- Q_deadWoodlawn %>% partial.series(ari = 1, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadWoodlawn$site_no[1], 
+         ari = "Q1") 
+
+peakQ_deadWoodlawnTrib <- Q_deadWoodlawnTrib %>% partial.series(ari = 1, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadWoodlawnTrib$site_no[1], 
+         ari = "Q1")
+
+peakQ_deadNearWoodlawn<- Q_deadNearWoodlawn %>% partial.series(ari = 1, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadNearWoodlawn$site_no[1], 
+         ari = "Q1")
+
+peakQ_deadAtWoodlawn<- Q_deadAtWoodlawn %>% partial.series(ari = 1, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadAtWoodlawn$site_no[1], 
+         ari = "Q1")
+
+peakQ_allSites <- bind_rows(peakQ_allSites, peakQ_glyndon, peakQ_delight, peakQ_redRun, peakQ_mcdonogh, 
+                        peakQ_scotts, peakQ_villaNova, peakQ_powderMill, peakQ_deadRun, 
+                        peakQ_gwynnRun,  peakQ_gwynOutlet, peakQ_owings, peakQ_maiden,
+                        peakQ_deadCatonsville, peakQ_deadWoodlawn, peakQ_deadWoodlawnTrib, peakQ_deadNearWoodlawn, peakQ_deadAtWoodlawn)
+
+#2-year
+peakQ_glyndon <- Q_glyndon %>% partial.series(ari = 2, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_glyndon$site_no[1], 
+         ari = "Q2")
+
+peakQ_delight <-Q_delight %>% partial.series(ari = 2, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_delight$site_no[1], 
+         ari = "Q2")
+
+peakQ_redRun <- Q_redRun %>% partial.series(ari = 2, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_redRun$site_no[1], 
+         ari = "Q2")
+
+peakQ_mcdonogh <-Q_mcdonogh %>% partial.series(ari = 2, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_mcdonogh$site_no[1], 
+         ari = "Q2")
+
+peakQ_scotts <- Q_scotts %>% partial.series(ari = 2, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_scotts$site_no[1], 
+         ari = "Q2")
+
+peakQ_villaNova <- Q_villaNova %>% partial.series(ari = 2, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_villaNova$site_no[1], 
+         ari = "Q2")
+
+peakQ_powderMill <- Q_powderMill %>% partial.series(ari = 2, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_powderMill$site_no[1], 
+         ari = "Q2")
+
+peakQ_deadRun <- Q_deadRun %>% partial.series(ari = 2, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadRun$site_no[1], 
+         ari = "Q2")
+
+peakQ_gwynnRun <- Q_gwynnRun %>% partial.series(ari = 2, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_gwynnRun$site_no[1], 
+         ari = "Q2")
+
+peakQ_gwynOutlet <- Q_gwynOutlet %>% partial.series(ari = 2, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_gwynOutlet$site_no[1], 
+         ari = "Q2")
+
+peakQ_owings <- Q_owings %>% partial.series(ari = 2, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_owings$site_no[1], 
+         ari = "Q2")
+
+peakQ_maiden <- Q_maiden %>% partial.series(ari = 2, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_maiden$site_no[1], 
+         ari = "Q2")
+
+peakQ_deadCatonsville <- Q_deadCatonsville %>% partial.series(ari = 2, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadCatonsville$site_no[1], 
+         ari = "Q2")
+
+peakQ_deadWoodlawn <- Q_deadWoodlawn %>% partial.series(ari = 2, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadWoodlawn$site_no[1], 
+         ari = "Q2") 
+
+peakQ_deadWoodlawnTrib <- Q_deadWoodlawnTrib %>% partial.series(ari = 2, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadWoodlawnTrib$site_no[1], 
+         ari = "Q2")
+
+peakQ_deadNearWoodlawn<- Q_deadNearWoodlawn %>% partial.series(ari = 2, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadNearWoodlawn$site_no[1], 
+         ari = "Q2")
+
+peakQ_deadAtWoodlawn<- Q_deadAtWoodlawn %>% partial.series(ari = 2, 
+                 ind.days = 7, 
+                 duration = T, 
+                 plot = F, 
+                 volume = T,
+                 series = FALSE)%>%
+  mutate(site_no = Q_deadAtWoodlawn$site_no[1], 
+         ari = "Q2")
+
+peakQ_allSites <- bind_rows(peakQ_allSites, peakQ_glyndon, peakQ_delight, peakQ_redRun, peakQ_mcdonogh, 
+                        peakQ_scotts, peakQ_villaNova, peakQ_powderMill, peakQ_deadRun, 
+                        peakQ_gwynnRun,  peakQ_gwynOutlet, peakQ_owings, peakQ_maiden,
+                        peakQ_deadCatonsville, peakQ_deadWoodlawn, peakQ_deadWoodlawnTrib, peakQ_deadNearWoodlawn, peakQ_deadAtWoodlawn)
+
+save(peakQ_allSites,
+     file = "C:/Users/morganao/Documents/CBT_Oehler2023/12_Saved_Dataframes/peakQ_allSites.RData")
+```
+
+#Based off Federman, 2022 and https://www.r-bloggers.com/2013/08/fitting-a-model-by-maximum-likelihood/
+```{r}
+library(bbmle)
+# ?mle2
+
+#Load "peakQ_allSites.RData"
+#combine DA data with flow data and separate peak flows into columns.
+gwynnGage_DAQ <- full_join(gwynnGage_info, peakQ_allSites, by = "site_no")
+peakQ_gwynns <- gwynnGage_DAQ %>% 
+  select(site_no, drain_area_va, ari, flow.threshold)%>%
+  pivot_wider(names_from = ari, values_from = flow.threshold)
+
+#define variables from partial series calculation. DA is from USGS.
+DA <- peakQ_gwynns$drain_area_va #mi2
+Qmonth <- peakQ_gwynns$Qm        #cfs
+Q0.5 <- peakQ_gwynns$Q0.5        #cfs
+Q1 <- peakQ_gwynns$Q1            #cfs
+Q2 <- peakQ_gwynns$Q2            #cfs
+
+#Least squares regression between flow and DA. Results are used as guesses for MLE
+fit_Qmonth <-lm(Qmonth~DA)
+summary(fit_Qmonth)
+
+fit_Q0.5 = lm(Q0.5~DA)
+summary(fit_Q0.5)
+
+fit_Q1 = lm(Q1~DA)
+summary(fit_Q1)
+
+fit_Q2 = lm(Q2~DA)
+summary(fit_Q2)
+
+#creating a formula to input into the mle2 function which calculates the parameters of max likelihood
+CBT_MLE_FIT  <-  function(Q,area,start){
+  y  <-  Q
+  x1  <-  DA
+  
+  LL <- function(beta0, beta1,mu, sigma) { #beta0~
+    R  <-  y - x1 * beta1 - beta0
+    #
+    R  <-  suppressWarnings(dnorm(R, mu, sigma, log = TRUE)) 
+    #
+    -sum(R)
+  }
+  
+  fit_Q <- mle2(LL, start)
+  summary(fit_Q)
+  return(fit_Q)
+}
+
+#using mle2 to calculate linear model parameters
+Qmonth_result <-  CBT_MLE_FIT(Qmonth,DA,start = list(beta0 = 45, beta1 = 14, mu = -40, sigma = 104))
+Q0.5_result <-  CBT_MLE_FIT(Q0.5,DA,start = list(beta0 = 299, beta1 = 60, mu = -140, sigma = 482))
+Q1_result <-  CBT_MLE_FIT(Q1,DA,start = list(beta0 = 350, beta1 = 94, mu = -350, sigma = 653))
+Q2_result <-  CBT_MLE_FIT(Q2,DA,start = list(beta0 = 455, beta1 = 117, mu = -300, sigma = 747))
+
+
+# summary(Qmonth_result)
+# summary(Q0.5_result)
+# summary(Q1_result)
+# summary(Q2_result)
+
+
+# coef(Qmonth_result)
+# coef(Q0.5_result)
+# coef(Q1_result)
+# coef(Q2_result)
+
+############### residuals #############
+#site numbers
+siteNumbers <- c("01589180", "01589197", "01589200", "01589230", "01589238","01589290", "01589300", "01589305",
+                 "01589312", "01589315","01589316","01589317", "01589320",
+                 "01589330", "01589351","0158935180", "01589352")
+
+
+#Regression equations resulting from MLE
+model_results  <-  data.frame(Qmonth = coef(Qmonth_result),
+                           Q0.5 = coef(Q0.5_result),
+                           Q1 = coef(Q1_result),
+                           Q2 = coef(Q2_result)
+                           )
+
+#Flows caluclated for each site using the MLE models
+model_flows  <-  data.frame(siteNumbers, flow_Qmonth = model_results$Qmonth[1]+model_results$Qmonth[2]*DA,
+                         flow_Q0.5 = model_results$Q0.5[1]+model_results$Q0.5[2]*DA,
+                         flow_Q1 = model_results$Q1[1]+model_results$Q1[2]*DA,
+                         flow_Q2 = model_results$Q2[1]+model_results$Q2[2]*DA
+                         )
+
+#Difference between partial.series flows and calculated model flows
+model_residuals <-  data.frame(siteNumbers,
+                             Qmonthresid = model_flows$flow_Qmonth-Qmonth,
+                             Q0.5resid = model_flows$flow_Q0.5-Q0.5,
+                             Q1resid = model_flows$flow_Q1-Q1,
+                             Q2resid = model_flows$flow_Q2-Q2
+                             )
+
+############## standardized Residuals #################
+#parameters used to convert to standardized residuals
+n = length(DA)
+mean = mean(DA)
+SS = sum((DA-mean(DA))^2)
+# SS = 891.6672
+
+standarderror  <-  data.frame(semonth = sd(Qmonth)/sqrt(n),
+                           se0.5 = sd(Q0.5)/sqrt(n),
+                           se1 = sd(Q1)/sqrt(n),
+                           se2 = sd(Q2)/sqrt(n)
+                           )
+
+model_leverage <-  data.frame(siteNumbers,
+                            lev = 1/n+(DA-mean)^2/SS)
+
+#calculated standardized residuals
+standard_residuals<- data.frame(siteNumbers,
+                                SRmonth = model_residuals$Qmonthresid/standarderror$semonth/sqrt(1-model_leverage$lev),
+                                SR0.5 = model_residuals$Q0.5resid/standarderror$se0.5/sqrt(1-model_leverage$lev),
+                                SR1 = model_residuals$Q1resid/standarderror$se1/sqrt(1-model_leverage$lev),
+                                SR2 = model_residuals$Q2resid/standarderror$se2/sqrt(1-model_leverage$lev)
+                                )
+
+#plot of standard residuals versus drainage area
+  
+
+# plot(DA,standard_residuals$SRmonth,pch=19, #ylim = c(-6,6), xlim = c(0,140),
+#      xlab = "Drainage area (square miles)",ylab = "Standardized Resdiuals",frame.plot = FALSE)
+# points(DA, standard_residuals$SR0.5,col = 2, pch=19)
+# points(DA, standard_residuals$SR1,col = 3,pch=19)
+# points(DA, standard_residuals$SR2,col = 4,pch=19)
+# abline(0,0)
+# abline(3,0, lty = "dashed")
+# abline(-3,0,lty = "dashed")
+# legend("topright", legend = c("monthly", "0.5yr","1 year","2 year"), 
+#        col = c(1,2,3,4),pch =19, cex=0.8)
+
+standard_residuals%>%
+  ggplot()+
+  geom_point(aes(DA,SRmonth, color = "monthly"))+
+  geom_point(aes(DA, SR0.5, color = "0.5-year"))+
+  geom_point(aes(DA, SR1, color = "1-year"))+
+  geom_point(aes(DA, SR2, color = "2-year"))+
+  labs(x = "Drainage area (square miles)", y = "Standardized Resdiuals", color = "")+
+  geom_hline(aes(yintercept = 0))+
+  geom_hline(aes(yintercept = 3), linetype = "dashed")+
+  geom_hline(aes(yintercept = -3), linetype = "dashed")+
+   scale_y_continuous(breaks=seq(-5, 5, 1))
+  
+################## Calculating Flows for our watershed ###############
+
+#Dataframe with locations of interest for peak flows
+## can update this data frame with the locations in the watershed we want, and their drainage areas
+# genericWS  <-  data.frame(location = c("end of 1","end of 2", ),DA = c(0.68,3.76))
+
+#Calculate peak recurrence interval flows for each location
+# generic_model_flows = data.frame(genericWS$location, 
+#                                  flow_Qmonth = model_results$Qmonth[1]+model_results$Qmonth[2]*genericWS$DA,
+#                                  flow_Q0.5 = model_results$Q0.5[1]+model_results$Q0.5[2]*genericWS$DA,
+#                                  flow_Q1 = model_results$Q1[1]+model_results$Q1[2]*genericWS$DA,
+#                                  flow_Q2 = model_results$Q2[1]+model_results$Q2[2]*genericWS$DA)
+```
+

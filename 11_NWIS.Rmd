@@ -369,3 +369,69 @@ timeCheck <- data.frame(seq(ymd_hm('2019-10-01 00:00'),ymd_hm('2020-09-30 23:45'
 
 ```
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+#Not using smith. Data not as reliable (more missing values) also NO3 concentration is unusually high)
+yrflux_smith <- readNWISuv("01493112", parameterCd, "2012-10-01T00:00", "2013-09-30T23:59", timeZone)%>%
+  renameNWISColumns()
+colnames(yrflux_smith)[6] ="NO3conc_mgL"
+colnames(yrflux_smith)[4] ="Q_cfs"
+
+#Plot 
+yrflux_smith%>% 
+  pivot_longer(c(Q_cfs, NO3conc_mgL))%>%
+  ggplot()+
+  geom_line(aes(x = dateTime, y = value))+
+  facet_wrap(~name, nrow = 2, scales = "free",
+             strip.position = "left")+
+  theme(strip.background = element_blank(),
+        strip.placement='outside')+
+  labs(x = "Date/Time", y = NULL)+
+  ggtitle( yrflux_smith$site_no[1])
+
+#Check how many values are missing
+sum(is.na(yrflux_smith$NO3conc_mgL))
+sum(is.na(yrflux_smith$Q_cfs))
+
+#find if the NAs are consecuative. If they are it may not be logical to just duplicate the value preceding
+yrflux_smith%>%filter(is.na(Q_cfs))
+yrflux_smith%>%filter(is.na(NO3conc_mgL))
+
+yrflux_smith$Q_cfs[1] <- 5.76
+yrflux_smith$Q_cfs <-na.locf(na.locf(yrflux_smith$Q_cfs),fromLast=TRUE)
+   #use the na.locf function to replace NA values with the values from the preceding row. this is okay bc flow does not usually change that much in 15 mins at baseflow.
+
+#find percentiles of conc to use the 25th percentile in replacement for any NA concentrations
+quant_smith <- quantile(yrflux_smith$NO3conc_mgL, na.rm = TRUE)
+yrflux_smith$NO3conc_mgL[is.na(yrflux_smith$NO3conc_mgL)] <- quant_chester[2]
+
+yrflux_smith <- yrflux_smith%>% 
+  # group_by(site_no)%>%
+  select(site_no, dateTime, Q_cfs, NO3conc_mgL)%>%
+  mutate(NO3_kg =
+           Q_cfs*NO3conc_mgL*15*60*28.32/1000/1000)
+sum(yrflux_smith$NO3conc_mgL)
+```
+
+#NHD plots
+```{r}
+#Packages needed for nhdplus connection
+library("nhdplusTools")
+library("sf")
+library("rdgal")
+
+plot_nhdplus("01589352")
+```
+

@@ -267,11 +267,17 @@ NO3_Full %>%
   ggplot() +
   geom_line(aes(x = PerShedRest, y = km_PerCumRem, color = storm), linewidth = 0.5)+
   geom_point(aes(x = PerShedRest, y = km_PerCumRem, color = storm, shape = restLoc), size = 0.8)+
-  xlab("Percent of Full Watershed Restored")+
-  ylab(expression("Percent NO"[3]*" Removed from the Watershed"))+
-  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~.*130.454/100, name = "Watershed Length Restored [km]", breaks = seq(0,135,10)))+
-  ggtitle(expression("Incremental Full Restoration of the Watershed: %NO"[3]*" Removed at the Outlet (k"[m]*")"))
-ggsave("Figures/Full_km.png", dpi=500,  units="in")
+  labs(x = expression("Percent of 4"^th*"-order Watershed Restored"),
+       color = "Storm",
+       shape = expression(atop("Location of","Restoraion")))+
+  scale_y_continuous(
+    name = expression("Percent NO"[3]*" Removed from the Watershed (k"[m]*")"),
+    limits = c(0, 1.25),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= expression("Percent NO"[3]*" Removed from the Watershed (k"[90]*")"), breaks = seq(0, 25, 5)))+
+  scale_x_continuous(breaks=seq(0,100,by=20),  sec.axis = sec_axis(~.*130.454/100, name = "Total Watershed Length Restored [km]", breaks = seq(0,135,10)))+
+  ggtitle(expression("Cumulative Restoration of the Full Watershed: %NO"[3]*" Removed at the 4"^th*"-order Outlet"))
+ggsave("Figures/Full_2axis.png", dpi=500, height = 5, width = 8, units="in")
+
 
 NO3_Full %>%
   filter(river == "4-1") %>%

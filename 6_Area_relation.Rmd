@@ -269,9 +269,9 @@ ggsave("Exports/unrVSrest_load41_km.png", units="in")
 #Area calcs DF
 ```{r}
 #Dataframes with the total inundated area and associated removal load over the simulation in each order due to single order restoration.
-Ainun_1stO <- inun_1stO %>%
-  filter(ti_tot_min > 0)%>%
-  mutate( #Calculating area
+Ainun_1stO <- inun_1stO %>% #contains DF of XS and their associated inundation time over the simulation
+  filter(ti_tot_min > 0)%>% #filter out XS that dont become inundated
+  mutate( #Calculating area by first assigning widths do each station (differs by plan)
     FP_width =
            case_when(
              plan == "unr" & river == "1-7" ~ 16.5,
@@ -314,7 +314,7 @@ Ainun_1stO <- inun_1stO %>%
   #                                     ~ (ti_tot_min/60)*Xcs*(FP_width*2)*k10/1000,
   #               river == "4-1" & STA %in% c(101000, 0)
   #                                     ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*k10/1000)) %>%
-   mutate(
+   mutate( #associated removal for the inundated XS
     km_removal_g =
       case_when(river == "1-7" & STA %in% c(165500,159500)
                                       ~ (ti_tot_min/60)*(Xcs/2)*(FP_width*2)*km/1000,
@@ -814,7 +814,21 @@ ggsave("Figures/Avsremoval_km_only100p.png", dpi=500, width = 16, height = 4, un
 ```
 
 ```{r}
-bind_rows(Ainun_1stO, Ainun_2ndO, Ainun_3rdO, Ainun_4thO)%>%
+#testing
+testA <- bind_rows(Ainun_1stO, Ainun_2ndO, Ainun_3rdO, Ainun_4thO)%>%
+  filter(scaleRemoval_km_kg>0)%>%
+  mutate(
+    restLoc = case_when(startsWith(plan, "1st")~"1-7",
+                        startsWith(plan, "2nd")~"2-2",
+                        startsWith(plan, "3rd")~"3-1",
+                        startsWith(plan, "4th")~"4-1"))%>%
+  filter(river == restLoc)
+
+
+# bind_rows(Ainun_1stO, Ainun_2ndO, Ainun_3rdO, Ainun_4thO)%>%
+
+#These include river areas only for scenarios where restoration occured in that river
+testA%>%
   mutate(restLoc = 
            case_when(startsWith(plan, "unr") ~ "unr",
                      startsWith(plan, "1st") ~ "1st",
@@ -837,61 +851,63 @@ bind_rows(Ainun_1stO, Ainun_2ndO, Ainun_3rdO, Ainun_4thO)%>%
   # filter(restLoc == "1st" | restLoc == "2nd")%>%
   ggplot()+
   geom_point(aes(scale_inun_A, scaleRemoval_km_kg, color = storm, shape= order), size = 1)+
-  ylim(0,30)+
   xlab((expression(atop("Inundated Floodplain Area (x10"^5*" m"^2*")"))))+
-  ylab(expression("NO"[3]*" Load Removed (kg)"))+
+  scale_y_continuous(
+    name = expression("Kilograms NO" [3]*" Removed (k" [m]*" rate)"),
+    # limits = c(0, 30),
+    sec.axis = sec_axis(trans=~.*21.31146981, name= expression("Kilograms NO" [3]*" Removed (k" [90]*" rate)")))+
   labs(color = "Storm", shape = "Areal Location")+
-  ggtitle(expression(atop("Inundated Area vs Nitrate Load Removed (k"[m]*" rate)")))+
+  ggtitle(expression(atop("Inundated Area vs Nitrate Load Removed")))+
   plot_annotation(theme = theme(title = element_text(size = 12, face = 2))) &
   theme(text = element_text(size = 10))
 
-ggsave("Figures/Avsremoval_km.png", dpi=500, width = 7, height = 4, units="in")
+ggsave("Figures/restoreOnly_Avsremoval_km.png", dpi=500, width = 7, height = 4, units="in")
 ```
 
 
 #Plot: total inundated FP area
 ```{r plot-wider, fig.width=13, fig.height=4}
-Ainun_1st <- inun_1stO %>%
+Ainun_1st <- Ainun_1stO %>%
   filter(river =="1-7")%>%
   ggplot()+
-  geom_point(aes(percentRest, inun_A, color=storm))+
-  geom_line(aes(percentRest, inun_A, color=storm))+
+  geom_point(aes(percentRest, scale_inun_A, color=storm))+
+  geom_line(aes(percentRest, scale_inun_A, color=storm))+
   scale_x_continuous(breaks=seq(0,100,by=20))+
-  # ylim(0,800000)+
+  ylim(0,13)+
   # scale_y_continuous(labels = scales::scientific)+
   xlab(expression(atop("Percent of 1"^st*"-Order Rivers Restored")))+
   ylab(expression(atop("Inundated Floodplain Area (x10"^5*" m"^2*")")))+
   ggtitle(expression("All 1"^st*"-order Rivers"))
 
-Ainun_2nd <- inun_2ndO %>%
+Ainun_2nd <- Ainun_2ndO %>%
   filter(river =="2-2")%>%
   ggplot()+
-  geom_point(aes(percentRest, inun_A, color=storm))+
-  geom_line(aes(percentRest, inun_A, color=storm))+
+  geom_point(aes(percentRest, scale_inun_A, color=storm))+
+  geom_line(aes(percentRest, scale_inun_A, color=storm))+
   scale_x_continuous(breaks=seq(0,100,by=20))+ 
-  # scale_y_continuous(labels = scales::scientific)+
+  ylim(0,13)+
   xlab(expression(atop("Percent of 2"^nd*"-Order Rivers Restored")))+
   ylab(element_blank())+
   ggtitle(expression("All 2"^nd*"-order Rivers"))
 
-Ainun_3rd <- inun_3rdO %>%
+Ainun_3rd <- Ainun_3rdO %>%
   filter(river =="3-1")%>%
   ggplot()+
-  geom_point(aes(percentRest, inun_A, color=storm))+
-  geom_line(aes(percentRest, inun_A, color=storm))+
+  geom_point(aes(percentRest, scale_inun_A, color=storm))+
+  geom_line(aes(percentRest, scale_inun_A, color=storm))+
   scale_x_continuous(breaks=seq(0,100,by=20))+ 
-  # scale_y_continuous(labels = scales::scientific)+
+  ylim(0,13)+
   xlab(expression(atop("Percent of 3"^rd*"-Order Rivers Restored")))+
   ylab(element_blank())+
   ggtitle(expression("All 3"^rd*"-order Rivers"))
 
-Ainun_4th <- inun_4thO %>%
+Ainun_4th <- Ainun_4thO %>%
   filter(river == "4-1")%>%
   ggplot()+
-  geom_point(aes(percentRest, inun_A, color=storm))+
-  geom_line(aes(percentRest, inun_A, color=storm))+
+  geom_point(aes(percentRest, scale_inun_A, color=storm))+
+  geom_line(aes(percentRest, scale_inun_A, color=storm))+
   scale_x_continuous(breaks=seq(0,100,by=20))+ 
-  # scale_y_continuous(labels = scales::scientific)+
+  ylim(0,13)+
   xlab(expression(atop("Percent of the 4"^th*"-Order River Restored")))+
   ylab(element_blank())+
   ggtitle(expression("All 4"^th*"-order Rivers"))

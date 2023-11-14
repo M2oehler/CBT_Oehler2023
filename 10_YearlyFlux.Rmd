@@ -104,6 +104,8 @@ yr_shedRem <- arrange(yr_shedRem, desc(sort_storm), sort_order, percentRest) %>%
                                plan == "4th-80p"~ 15100,
                                plan == "4th-100p"~ 17357),
          pRem_km = (km_yr_stormRem_kg+yr_hypRem_kg)/(yr_stormLoad_kg+add_baseLoad_kg)*100,
+         km_flux_kg = (yr_stormLoad_kg+add_baseLoad_kg)-(km_yr_stormRem_kg+yr_hypRem_kg),
+         k90_flux_kg = (yr_stormLoad_kg+add_baseLoad_kg)-(k90_yr_stormRem_kg+yr_hypRem_kg),
          pRem_k10 = (k10_yr_stormRem_kg+yr_hypRem_kg)/(yr_stormLoad_kg+add_baseLoad_kg)*100,
          pRem_k90 = (k90_yr_stormRem_kg+yr_hypRem_kg)/(yr_stormLoad_kg+add_baseLoad_kg)*100,
          H_Prem = (yr_hypRem_kg)/(yr_stormLoad_kg+add_baseLoad_kg)*100,
@@ -111,11 +113,11 @@ yr_shedRem <- arrange(yr_shedRem, desc(sort_storm), sort_order, percentRest) %>%
          S_Prem_k10 = (k10_yr_stormRem_kg)/(yr_stormLoad_kg+add_baseLoad_kg)*100,
          S_Prem_k90 = (k90_yr_stormRem_kg)/(yr_stormLoad_kg+add_baseLoad_kg)*100,
          restLoc = 
-           case_when(startsWith(plan, "unr") ~ "1st-order Restoration",
-                     startsWith(plan, "1st") ~ "1st-order Restoration",
-                     startsWith(plan, "2nd") ~ "2nd-order Restoration",
-                     startsWith(plan, "3rd") ~ "3rd-order Restoration",
-                     startsWith(plan, "4th") ~ "4th-order Restoration"))
+           case_when(startsWith(plan, "unr") ~ "1st-order rivers",
+                     startsWith(plan, "1st") ~ "1st-order rivers",
+                     startsWith(plan, "2nd") ~ "2nd-order rivers",
+                     startsWith(plan, "3rd") ~ "3rd-order rivers",
+                     startsWith(plan, "4th") ~ "4th-order river"))
 
 
 yr_ADDunr <- data.frame(plan = c("unr", "unr","unr"),
@@ -127,13 +129,15 @@ yr_ADDunr <- data.frame(plan = c("unr", "unr","unr"),
                        add_baseLoad_kg = c(30865,30865, 30865), 
                        yr_hypRem_kg = c(0,0,0),
                        pRem_km = c(0.02533309, 0.02533309, 0.02533309),
+                       km_flux_kg = c(46536.83, 46536.83, 46536.83),
+                       k90_flux_kg = c(46297.31, 46297.31, 46297.31),
                        pRem_k10 = c(0.002783643, 0.002783643, 0.002783643),
                        pRem_k90 = c(0.5398856, 0.5398856, 0.5398856),
                        H_Prem = c(0,0,0),
                        S_Prem_km = c(0.02533309, 0.02533309, 0.02533309),
                        S_Prem_k10 =  c(0.002783643, 0.002783643, 0.002783643), 
                        S_Prem_k90 =  c(0.5398856, 0.5398856, 0.5398856), 
-                       restLoc = c("2nd-order Restoration", "3rd-order Restoration", "4th-order Restoration"))
+                       restLoc = c("2nd-order rivers", "3rd-order rivers", "4th-order river"))
 
 yr_shedRem <- bind_rows(yr_shedRem, yr_ADDunr)
 
@@ -161,6 +165,29 @@ ggsave("Figures/yr_Prem_km.png", height = 5, width = 7, dpi=500, units="in")
 yr_shedRem <- yr_shedRem%>%
   mutate(flux = yr_stormLoad_kg + add_baseLoad_kg - km_yr_stormRem_kg - yr_hypRem_kg)
 
+
+
+
+
+
+
+
+yr_shedRem %>% 
+  ggplot()+
+  geom_line(aes(percentRest, k90_flux_kg, color = restLoc), linewidth = 0.3)+
+  geom_point(aes(percentRest, k90_flux_kg, color = restLoc), size = 0.8)+
+  # facet_wrap( ~restLoc, scales = "free", ncol = 2)+
+  scale_x_continuous(breaks=seq(0,100,by=20))+
+  labs(y = expression("NO3 Flux (kg)"),
+       x = "Percent Floodplains Restored",
+       color = "Location of Restoration")+
+  ggtitle(expression("Yearly Nitrate Flux in a 4"^th*"-order Watershed using k"[90]*" Floodplain Removal Rate"))+ 
+  # labs(color='Removal Type') +
+  theme(text = element_text(size = 8), 
+        title = element_text(size = 10))
+ggsave("Figures/yr_flux_k90.png", height = 5, width = 7, dpi=500, units="in")
+
+write.csv(yr_shedRem, file = "CBT_Oehler2023/13_Exports/yearly_flux.csv")
 ```
 
 
